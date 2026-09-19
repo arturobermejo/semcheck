@@ -4,7 +4,6 @@ import (
 	"go/ast"
 	"testing"
 
-	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/analysistest"
 )
 
@@ -78,8 +77,7 @@ func TestHasTestSignature(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			file, info := typeCheck(t, "package p\n\nimport "+tt.imports+"\n\n"+tt.decl+"\n", imp)
-			pass := &analysis.Pass{TypesInfo: info}
+			file, pass := typeCheck(t, "package p\n\nimport "+tt.imports+"\n\n"+tt.decl+"\n", imp)
 
 			// The function under test is the last declaration.
 			fn := file.Decls[len(file.Decls)-1].(*ast.FuncDecl)

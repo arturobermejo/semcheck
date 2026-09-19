@@ -7,6 +7,8 @@ import (
 	"go/token"
 	"go/types"
 	"testing"
+
+	"golang.org/x/tools/go/analysis"
 )
 
 // fakeImporter resolves imports to packages built by hand, so that a test can
@@ -36,8 +38,9 @@ func fakePackage(path, name string, typeNames ...string) *types.Package {
 	return pkg
 }
 
-// typeCheck parses and type-checks src, a whole file of a package named p.
-func typeCheck(t *testing.T, src string, imp types.Importer) (*ast.File, *types.Info) {
+// typeCheck parses and type-checks src, a whole file of a package named p, and
+// returns the parts of an analysis.Pass that come from it.
+func typeCheck(t *testing.T, src string, imp types.Importer) (*ast.File, *analysis.Pass) {
 	t.Helper()
 
 	fset := token.NewFileSet()
@@ -54,9 +57,11 @@ func typeCheck(t *testing.T, src string, imp types.Importer) (*ast.File, *types.
 	}
 
 	conf := types.Config{Importer: imp}
-	if _, err := conf.Check("p", fset, []*ast.File{file}, info); err != nil {
+
+	pkg, err := conf.Check("p", fset, []*ast.File{file}, info)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	return file, info
+	return file, &analysis.Pass{Fset: fset, Files: []*ast.File{file}, Pkg: pkg, TypesInfo: info}
 }
