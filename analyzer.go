@@ -12,10 +12,10 @@ import (
 // Analyzer is the semcheck analysis. There are no rules yet: it reports every
 // node selected by the matchers.
 var Analyzer = newMatchAnalyzer(
-	exportedFuncDoc,
-	must(funcPrefix("Get", "Is", "Has", "Find", "List")),
-	testFunc,
-	must(callTo("log.*", "slog.*", "zap.*", "zerolog.*")),
+	must(MatchSpec{Matcher: "exported-func-doc"}.matcher()),
+	must(MatchSpec{Matcher: "func-prefix", Args: []string{"Get", "Is", "Has", "Find", "List"}}.matcher()),
+	must(MatchSpec{Matcher: "test-func"}.matcher()),
+	must(MatchSpec{Matcher: "call", Args: []string{"log.*", "slog.*", "zap.*", "zerolog.*"}}.matcher()),
 )
 
 func newMatchAnalyzer(matchers ...*Matcher) *analysis.Analyzer {

@@ -1,0 +1,15 @@
+# Well-formed YAML in which every rule has something wrong.
+rules:
+  - name: no-pii-in-logs
+    match: { call: ["log"] }
+    ask: "Does this log include personal data?"
+    min_confidence: 7
+
+  - name: no-pii-in-logs
+    match: http-handler
+    ask: "   "
+
+  - match: { exported-func-doc: {} }
+    ask: "Does the comment describe what the function does?"
+    context: statement
+    severity: fatal

@@ -22,7 +22,7 @@ import (
 // only the outermost is selected: it contains the others.
 func callTo(patterns ...string) (*Matcher, error) {
 	if len(patterns) == 0 {
-		return nil, errors.New("semcheck: call needs at least one pattern")
+		return nil, errors.New("call needs at least one pattern")
 	}
 
 	parsed := make([]callPattern, len(patterns))
@@ -74,14 +74,14 @@ type callPattern struct {
 func parseCallPattern(s string) (callPattern, error) {
 	i := strings.LastIndex(s, ".")
 	if i <= 0 || i == len(s)-1 {
-		return callPattern{}, fmt.Errorf("semcheck: call: %q must look like pkg.Func or pkg.*", s)
+		return callPattern{}, fmt.Errorf("call: %q must look like pkg.Func or pkg.*", s)
 	}
 
 	p := callPattern{pkg: s[:i], fn: s[i+1:]}
 
 	// A slash means the dot was inside the import path: "go.uber.org/zap".
 	if _, err := path.Match(p.fn, ""); err != nil || strings.Contains(p.fn, "/") {
-		return callPattern{}, fmt.Errorf("semcheck: call: %q must look like pkg.Func or pkg.*", s)
+		return callPattern{}, fmt.Errorf("call: %q must look like pkg.Func or pkg.*", s)
 	}
 
 	return p, nil

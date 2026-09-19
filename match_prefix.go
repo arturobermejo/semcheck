@@ -18,12 +18,12 @@ import (
 // the given words, such as Get, Is or Has.
 func funcPrefix(prefixes ...string) (*Matcher, error) {
 	if len(prefixes) == 0 {
-		return nil, errors.New("semcheck: func-prefix needs at least one prefix")
+		return nil, errors.New("func-prefix needs at least one prefix")
 	}
 
 	for _, p := range prefixes {
 		if !token.IsIdentifier(p) {
-			return nil, fmt.Errorf("semcheck: func-prefix: %q is not a valid Go identifier", p)
+			return nil, fmt.Errorf("func-prefix: %q is not a valid Go identifier", p)
 		}
 	}
 

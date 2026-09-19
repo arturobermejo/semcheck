@@ -57,8 +57,7 @@ const (
 	AnswerNo  Answer = "no"
 )
 
-// LoadConfig reads and decodes a configuration file. It does not check that
-// the rules make sense.
+// LoadConfig reads a configuration file. The Config it returns is valid.
 func LoadConfig(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -68,6 +67,10 @@ func LoadConfig(path string) (*Config, error) {
 	cfg, err := parseConfig(data)
 	if err != nil {
 		return nil, fmt.Errorf("semcheck: %s: %w", path, err)
+	}
+
+	if err := cfg.Validate(); err != nil {
+		return nil, fmt.Errorf("semcheck: %s: invalid configuration:\n%w", path, err)
 	}
 
 	return cfg, nil
@@ -136,9 +139,9 @@ func (a *Answer) UnmarshalYAML(node *yaml.Node) error {
 	return fmt.Errorf("line %d: report_if must be yes or no", node.Line)
 }
 
-func (m *MatchSpec) UnmarshalYAML(node *yaml.Node) error {
+func (spec *MatchSpec) UnmarshalYAML(node *yaml.Node) error {
 	if node.Kind == yaml.ScalarNode && node.Value != "" {
-		*m = MatchSpec{Matcher: node.Value}
+		*spec = MatchSpec{Matcher: node.Value}
 
 		return nil
 	}
@@ -155,7 +158,7 @@ func (m *MatchSpec) UnmarshalYAML(node *yaml.Node) error {
 		return fmt.Errorf("line %d: matcher %s: %w", value.Line, name.Value, err)
 	}
 
-	*m = MatchSpec{Matcher: name.Value, Args: args}
+	*spec = MatchSpec{Matcher: name.Value, Args: args}
 
 	return nil
 }
