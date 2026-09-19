@@ -6,6 +6,8 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -234,5 +236,27 @@ func TestStandaloneWithoutModel(t *testing.T) {
 	got = runWith(t, env, command(t), "-config=testdata/.semcheck.yml", "./testdata/clean")
 	if got != (result{}) {
 		t.Errorf("got %+v, want no output and exit code 0", got)
+	}
+}
+
+// The fixtures label each log with a letter. The ones that must be reported
+// are those golangci-lint v2.13.2 reported for the same files with semcheck as
+// a plugin: the command has to honor //nolint the way golangci-lint does.
+func TestStandaloneNolint(t *testing.T) {
+	got := run(t, command(t), "-c=0", "-config=testdata/.semcheck.yml", "./testdata/nolint", "./testdata/nolintfile")
+
+	if got.exitCode != 3 {
+		t.Errorf("exit code = %d, want 3", got.exitCode)
+	}
+
+	var labels []string
+	for _, m := range regexp.MustCompile(`Println\("([A-Z]) `).FindAllStringSubmatch(got.stderr, -1) {
+		labels = append(labels, m[1])
+	}
+
+	slices.Sort(labels)
+
+	if reported := strings.Join(labels, ""); reported != "ACEHIOSUW" {
+		t.Errorf("reported %s, want ACEHIOSUW:\n%s", reported, got.stderr)
 	}
 }

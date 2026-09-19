@@ -43,7 +43,7 @@ func newPlugin(settings any) (register.LinterPlugin, error) {
 		return nil, err
 	}
 
-	analyzer, err := NewAnalyzer(cfg, judge)
+	analyzer, err := newAnalyzer(cfg, judge, false)
 	if err != nil {
 		return nil, err
 	}

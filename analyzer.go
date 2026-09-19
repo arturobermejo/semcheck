@@ -18,8 +18,15 @@ import (
 const judgeTimeout = 2 * time.Minute
 
 // NewAnalyzer returns the analysis that enforces the rules of cfg, asking judge
-// about the code each rule selects.
+// about the code each rule selects. It honors //nolint directives.
 func NewAnalyzer(cfg *Config, judge Judge) (*analysis.Analyzer, error) {
+	return newAnalyzer(cfg, judge, true)
+}
+
+// newAnalyzer lets the plugin leave //nolint to golangci-lint. There, a
+// directive counts as used only if it silences a finding that exists: skipping
+// the question would make nolintlint report every one of them as unused.
+func newAnalyzer(cfg *Config, judge Judge, honorNolint bool) (*analysis.Analyzer, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, fmt.Errorf("semcheck: invalid configuration:\n%w", err)
 	}
@@ -36,7 +43,7 @@ func NewAnalyzer(cfg *Config, judge Judge) (*analysis.Analyzer, error) {
 		Doc:      "checks rules written in natural language on the code that AST matchers select",
 		Requires: []*analysis.Analyzer{inspect.Analyzer},
 		Run: func(pass *analysis.Pass) (any, error) {
-			return nil, check(pass, cfg.Rules, matchers, judge)
+			return nil, check(pass, cfg.Rules, matchers, judge, honorNolint)
 		},
 	}, nil
 }
@@ -47,15 +54,25 @@ type inquiry struct {
 	pos  token.Pos
 }
 
-func check(pass *analysis.Pass, rules []Rule, matchers []*Matcher, judge Judge) error {
+func check(pass *analysis.Pass, rules []Rule, matchers []*Matcher, judge Judge, honorNolint bool) error {
 	var (
 		inquiries []inquiry
 		questions []Question
 	)
 
+	var silenced nolint
+	if honorNolint {
+		silenced = newNolint(pass)
+	}
+
 	for i, r := range rules {
 		for _, match := range matchers[i].matches(pass) {
 			if inTestFile(pass, match.Node) && !r.Tests && !matchers[i].ForTests {
+				continue
+			}
+
+			// Before asking: a finding nobody will see is not worth a question.
+			if silenced.covers(pass.Fset, match.Pos) {
 				continue
 			}
 
