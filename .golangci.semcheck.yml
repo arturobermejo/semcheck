@@ -1,0 +1,18 @@
+# Configuration for ./custom-gcl, the golangci-lint build that includes
+# semcheck (see .custom-gcl.yml). The stock golangci-lint does not know this
+# linter, which is why it is kept out of .golangci.yml.
+version: "2"
+
+linters:
+  default: none
+  enable:
+    - semcheck
+  settings:
+    custom:
+      semcheck:
+        type: module
+        description: Natural-language rules checked on exact AST nodes.
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

@@ -1,0 +1,7 @@
+# Recipe for "golangci-lint custom": builds ./custom-gcl, a golangci-lint binary
+# with semcheck compiled in. The version must match the one in the Makefile.
+version: v2.13.2
+name: custom-gcl
+plugins:
+  - module: github.com/arturobermejo/semcheck
+    path: .
