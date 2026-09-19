@@ -80,6 +80,7 @@ func run(t *testing.T, name string, args ...string) result {
 var wantDiagnostics = []string{
 	"hello.go:5:6: found function Hello",
 	"hello.go:9:16: found function greet",
+	"hello.go:11:13: found function literal",
 }
 
 func checkDiagnostics(t *testing.T, output string) {

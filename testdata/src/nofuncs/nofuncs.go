@@ -1,8 +1,12 @@
-// Package nofuncs has no function declarations: the analyzer must stay silent.
+// Package nofuncs has no functions of any kind: the analyzer must stay silent.
 package nofuncs
 
 const Answer = 42
 
-var Double = func(x int) int { return 2 * x }
+// Transform is a function type, not a function.
+type Transform func(int) int
+
+// Identity has a function type, but no function literal as its value.
+var Identity Transform
 
 type Celsius float64

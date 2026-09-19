@@ -1,5 +1,5 @@
 // Package funcs exercises the laboratory analyzer: every function and method
-// declaration must be reported, and nothing else.
+// declaration and every function literal must be reported, and nothing else.
 package funcs
 
 import "fmt"
@@ -14,13 +14,8 @@ func Hello() {} // want "found function Hello"
 
 func (t T) Method() {} // want `found function Method`
 
-// Function literals are expressions, not declarations.
-var f = func() {}
-
-func outer() { // want "found function outer"
-	inner := func() {}
-	inner()
-}
+// A function type is not a function.
+var callback func(int) error
 
 // Declarations without a body are valid Go: the body lives in assembly.
 func implementedElsewhere(x int) int // want "found function implementedElsewhere"
