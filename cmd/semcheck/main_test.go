@@ -4,41 +4,49 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 )
 
-// binary is the path of the semcheck executable built by TestMain.
-var binary string
+// childEnv marks a process that must behave as the semcheck command instead
+// of as the test binary.
+const childEnv = "SEMCHECK_TEST_RUN_MAIN"
 
-// TestMain builds the command once, so every test runs the real binary the
-// same way a user or CI would.
+// TestMain lets the test binary play two roles. Run by "go test", it runs the
+// tests. Re-executed by those tests with childEnv set, it becomes the command
+// itself: same main, same flags, same exit codes.
+//
+// Building the command with "go build" from the tests would work too, but the
+// test cache cannot see that dependency: after a change in the analyzer,
+// "go test" would happily report a cached "ok". Calling main from here makes
+// the dependency part of the test binary.
 func TestMain(m *testing.M) {
-	os.Exit(runTests(m))
+	if os.Getenv(childEnv) == "1" {
+		main() // never returns: singlechecker.Main ends in os.Exit
+	}
+
+	os.Exit(m.Run())
 }
 
-func runTests(m *testing.M) int {
-	dir, err := os.MkdirTemp("", "semcheck-test-")
+// command returns the path of an executable that behaves as the command: the
+// test binary itself, provided childEnv is set in its environment.
+func command(t *testing.T) string {
+	t.Helper()
+
+	exe, err := os.Executable()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return 1
+		t.Fatal(err)
 	}
 
-	defer func() { _ = os.RemoveAll(dir) }()
+	return exe
+}
 
-	binary = filepath.Join(dir, "semcheck")
-
-	out, err := exec.Command("go", "build", "-o", binary, ".").CombinedOutput()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "go build: %v\n%s", err, out)
-		return 1
-	}
-
-	return m.Run()
+// childEnviron is the current environment plus childEnv. It is inherited by
+// grandchildren too, which is how the binary that go vet starts knows its role.
+func childEnviron() []string {
+	return append(os.Environ(), childEnv+"=1")
 }
 
 // result is what a process leaves behind: two streams and an exit code.
@@ -53,6 +61,7 @@ func run(t *testing.T, name string, args ...string) result {
 	var stdout, stderr bytes.Buffer
 
 	cmd := exec.Command(name, args...)
+	cmd.Env = childEnviron()
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
@@ -89,7 +98,7 @@ func checkDiagnostics(t *testing.T, output string) {
 }
 
 func TestStandaloneFindings(t *testing.T) {
-	got := run(t, binary, "./testdata/hello")
+	got := run(t, command(t), "./testdata/hello")
 
 	if got.exitCode != 3 {
 		t.Errorf("exit code = %d, want 3", got.exitCode)
@@ -103,7 +112,7 @@ func TestStandaloneFindings(t *testing.T) {
 }
 
 func TestStandaloneClean(t *testing.T) {
-	got := run(t, binary, "./testdata/clean")
+	got := run(t, command(t), "./testdata/clean")
 
 	if got != (result{}) {
 		t.Errorf("got %+v, want no output and exit code 0", got)
@@ -111,7 +120,7 @@ func TestStandaloneClean(t *testing.T) {
 }
 
 func TestStandaloneLoadError(t *testing.T) {
-	got := run(t, binary, "./testdata/does-not-exist")
+	got := run(t, command(t), "./testdata/does-not-exist")
 
 	if got.exitCode != 1 {
 		t.Errorf("exit code = %d, want 1", got.exitCode)
@@ -123,7 +132,7 @@ func TestStandaloneLoadError(t *testing.T) {
 }
 
 func TestStandaloneJSON(t *testing.T) {
-	got := run(t, binary, "-json", "./testdata/hello")
+	got := run(t, command(t), "-json", "./testdata/hello")
 
 	if got.exitCode != 0 {
 		t.Errorf("exit code = %d, want 0: -json never fails on findings", got.exitCode)
@@ -154,7 +163,7 @@ func TestStandaloneJSON(t *testing.T) {
 }
 
 func TestVetTool(t *testing.T) {
-	got := run(t, "go", "vet", "-vettool="+binary, "./testdata/hello")
+	got := run(t, "go", "vet", "-vettool="+command(t), "./testdata/hello")
 
 	if got.exitCode != 1 {
 		t.Errorf("exit code = %d, want 1: go vet hides the tool's own code", got.exitCode)
