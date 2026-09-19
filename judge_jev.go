@@ -32,6 +32,10 @@ type JevJudge struct {
 	Model  string
 	Client *http.Client
 
+	// MaxRetries is how many times a request that failed for a passing reason,
+	// such as an overloaded API, is sent again: 2 if zero, never if negative.
+	MaxRetries int
+
 	// Concurrency is the most requests in flight, DefaultJevConcurrency if
 	// zero. All the calls to Decide share it: drivers analyze packages in
 	// parallel, and a limit for each would be no limit.
@@ -88,7 +92,7 @@ func (j *JevJudge) Decide(ctx context.Context, questions []Question) ([]Decision
 	defer cancel(nil)
 
 	var (
-		client    = &jev.Client{APIKey: j.APIKey, URL: j.URL, Model: j.Model, HTTPClient: j.Client}
+		client    = &jev.Client{APIKey: j.APIKey, URL: j.URL, Model: j.Model, HTTPClient: j.Client, MaxRetries: j.MaxRetries}
 		decisions = make([]Decision, len(questions))
 		answered  = make([]bool, len(questions))
 		wg        sync.WaitGroup

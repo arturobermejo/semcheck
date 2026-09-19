@@ -78,8 +78,9 @@ func newFakeJev(t *testing.T, answer func(code, ask string) float64) *fakeJev {
 	return api
 }
 
+// judge returns one that does not retry.
 func (api *fakeJev) judge() *JevJudge {
-	return &JevJudge{APIKey: testKey, URL: api.URL}
+	return &JevJudge{APIKey: testKey, URL: api.URL, MaxRetries: -1}
 }
 
 func (api *fakeJev) requests() []jevCall {
@@ -380,6 +381,39 @@ func TestJevJudgeFailureInParallel(t *testing.T) {
 		if !answered && !failed || i == 10 && !failed {
 			t.Errorf("decision %d = %+v, want an answer or the 401", i, d)
 		}
+	}
+}
+
+func TestJevJudgeRetries(t *testing.T) {
+	var failed sync.Map
+
+	api := newFakeJev(t, always(0.7))
+	api.handle = func(w http.ResponseWriter, call jevCall) bool {
+		_, seen := failed.LoadOrStore(call.State.Code, true)
+		if !seen {
+			w.Header().Set("Retry-After-Ms", "1")
+			w.WriteHeader(http.StatusTooManyRequests)
+		}
+
+		return !seen
+	}
+
+	judge := api.judge()
+	judge.MaxRetries = 0 // the default
+
+	decisions, err := judge.Decide(context.Background(), questions(letters(5)...))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i, d := range decisions {
+		if d.Yes != 0.7 || d.Err != nil {
+			t.Errorf("decision %d = %+v, want the answer of the second attempt", i, d)
+		}
+	}
+
+	if n := len(api.requests()); n != 10 {
+		t.Errorf("%d requests, want every one of the 5 sent twice", n)
 	}
 }
 
