@@ -126,7 +126,26 @@ func TestJevJudgeRequest(t *testing.T) {
 
 	got, _ := json.Marshal(api.requests()[0].raw)
 	if wantJSON, _ := json.Marshal(want); string(got) != string(wantJSON) {
-		t.Errorf("body:\n got %s\nwant %s", got, wantJSON)
+		t.Errorf("body:\n got %s\nwant %s\nIf the change is meant, jevPrompt has to change too: "+
+			"the cache holds answers to the old request", got, wantJSON)
+	}
+}
+
+func TestJevJudgeIdentity(t *testing.T) {
+	tests := []struct {
+		judge *JevJudge
+		want  string
+	}{
+		{&JevJudge{}, "jev 1 jev-latest"},
+		{&JevJudge{Model: "jev-1.13.0"}, "jev 1 jev-1.13.0"},
+		// Who asks, where and how often does not change the answers.
+		{&JevJudge{APIKey: testKey, URL: "http://localhost", Concurrency: 2, MaxRetries: 5}, "jev 1 jev-latest"},
+	}
+
+	for _, tt := range tests {
+		if got := tt.judge.identity(); got != tt.want {
+			t.Errorf("identity = %q, want %q", got, tt.want)
+		}
 	}
 }
 

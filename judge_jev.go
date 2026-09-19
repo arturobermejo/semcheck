@@ -47,6 +47,18 @@ type JevJudge struct {
 
 var _ Judge = (*JevJudge)(nil)
 
+// jevPrompt changes when what Jev gets to read for a question does: the names
+// or the contents of jevState, or how the questions are put. The answers given
+// to the old prompt say nothing about the new one.
+const jevPrompt = "1"
+
+// identity names what the answers of j depend on besides the questions, for
+// the keys of the cache. With a model alias such as jev-latest, the answers of
+// the version it meant before stay in use when it moves on.
+func (j *JevJudge) identity() string {
+	return "jev " + jevPrompt + " " + cmp.Or(j.Model, jev.DefaultModel)
+}
+
 // jevState is what Jev reads to answer. Its field names are part of the
 // prompt: the model sees them.
 type jevState struct {
