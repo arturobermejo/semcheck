@@ -72,6 +72,7 @@ var wantDiagnostics = []string{
 	"hello.go:12:16: func-prefix: matched",
 	"hello.go:15:16: exported-func-doc: matched",
 	"hello.go:15:16: func-prefix: matched",
+	"hello_test.go:5:6: test-func: matched",
 }
 
 func checkDiagnostics(t *testing.T, output string) {
@@ -140,7 +141,16 @@ func TestStandaloneJSON(t *testing.T) {
 		t.Fatalf("stdout is not JSON: %v\n%s", err, got.stdout)
 	}
 
-	const pkg = "github.com/arturobermejo/semcheck/cmd/semcheck/testdata/hello"
+	// A package with tests is analyzed twice. Only the test variant contains
+	// hello_test.go; the text output hides the repetition, JSON does not.
+	const (
+		path = "github.com/arturobermejo/semcheck/cmd/semcheck/testdata/hello"
+		pkg  = path + " [" + path + ".test]"
+	)
+
+	if len(report) != 2 {
+		t.Errorf("got %d package variants, want 2:\n%s", len(report), got.stdout)
+	}
 
 	diags := report[pkg]["semcheck"]
 	if len(diags) != len(wantDiagnostics) {

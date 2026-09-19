@@ -65,6 +65,12 @@ func hasWordPrefix(name, prefix string) bool {
 		return false
 	}
 
+	return startsNewWord(rest)
+}
+
+// startsNewWord reports whether rest, what follows a prefix in a name, is empty
+// or begins another word: anything but a lowercase letter.
+func startsNewWord(rest string) bool {
 	next, _ := utf8.DecodeRuneInString(rest)
 
 	return rest == "" || !unicode.IsLower(next)

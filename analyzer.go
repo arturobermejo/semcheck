@@ -14,6 +14,7 @@ import (
 var Analyzer = newMatchAnalyzer(
 	exportedFuncDoc,
 	must(funcPrefix("Get", "Is", "Has", "Find", "List")),
+	testFunc,
 )
 
 func newMatchAnalyzer(matchers ...*Matcher) *analysis.Analyzer {
