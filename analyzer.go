@@ -21,6 +21,12 @@ var Analyzer = &analysis.Analyzer{
 // drivers may analyze packages in parallel or in separate processes.
 func run(pass *analysis.Pass) (any, error) {
 	for _, file := range pass.Files {
+		// Nobody can act on findings in generated code, such as the main
+		// package that "go test" synthesizes for every tested package.
+		if ast.IsGenerated(file) {
+			continue
+		}
+
 		for _, decl := range file.Decls {
 			fn, ok := decl.(*ast.FuncDecl)
 			if !ok {
