@@ -1,0 +1,33 @@
+version: "2"
+
+linters:
+  default: none
+  enable:
+    - govet
+    - staticcheck
+    - wsl_v5
+  settings:
+    govet:
+      enable-all: true
+      disable:
+        # Reordering struct fields for padding hurts readability more than it saves.
+        - fieldalignment
+    staticcheck:
+      checks:
+        - all
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+  settings:
+    gofumpt:
+      extra:
+        group-params: true
+    goimports:
+      local-prefixes:
+        - github.com/arturobermejo/semcheck
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
