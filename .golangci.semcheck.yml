@@ -16,3 +16,7 @@ linters:
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0
+  # golangci-lint keeps one issue per linter and line. To it all the rules of
+  # semcheck are one linter: without this, two rules that find something on the
+  # same line would show as one.
+  uniq-by-line: false

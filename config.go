@@ -37,6 +37,13 @@ type Rule struct {
 
 	Context  Context `yaml:"context"`
 	Severity string  `yaml:"severity"`
+
+	// Message is what a finding says. If empty, it is made from Ask.
+	Message string `yaml:"message"`
+
+	// Tests makes the rule look at _test.go files too. Matchers that are
+	// about tests, such as test-func, always do.
+	Tests bool `yaml:"tests"`
 }
 
 // A MatchSpec names a matcher and gives its arguments, as written in

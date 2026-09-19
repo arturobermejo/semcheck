@@ -11,8 +11,9 @@ import (
 
 // testFunc selects the test functions: TestXxx(*testing.T) in _test.go files.
 var testFunc = &Matcher{
-	Name:  "test-func",
-	Types: []ast.Node{(*ast.FuncDecl)(nil)},
+	Name:     "test-func",
+	Types:    []ast.Node{(*ast.FuncDecl)(nil)},
+	ForTests: true,
 	Match: func(pass *analysis.Pass, cur inspector.Cursor) (Match, bool) {
 		fn := cur.Node().(*ast.FuncDecl)
 
@@ -32,8 +33,8 @@ func isTestName(name string) bool {
 	return ok && startsNewWord(rest)
 }
 
-func inTestFile(pass *analysis.Pass, fn *ast.FuncDecl) bool {
-	return strings.HasSuffix(pass.Fset.File(fn.Pos()).Name(), "_test.go")
+func inTestFile(pass *analysis.Pass, node ast.Node) bool {
+	return strings.HasSuffix(pass.Fset.File(node.Pos()).Name(), "_test.go")
 }
 
 func hasTestSignature(pass *analysis.Pass, fn *ast.FuncDecl) bool {

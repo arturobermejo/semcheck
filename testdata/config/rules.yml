@@ -1,0 +1,24 @@
+# The rules of the end-to-end tests of the analyzer, judged by a FakeJudge.
+rules:
+  - name: no-pii-in-logs
+    match: { call: ["log.*", "slog.*"] }
+    ask: "Does this log include personal data?"
+    message: this log includes personal data
+    context: statement
+
+  - name: log-level-fits
+    match: { call: ["slog.*"] }
+    ask: "Is the level of this log wrong for what its message says?"
+    message: the level does not fit the message
+    min_confidence: 0.8
+    context: statement
+
+  - name: doc-matches-code
+    match: exported-func-doc
+    ask: "Does the comment describe what the function does?"
+    report_if: no
+
+  - name: test-name-matches
+    match: test-func
+    ask: "Does the name of the test differ from what it checks?"
+    message: the name does not say what the test checks

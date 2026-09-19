@@ -27,6 +27,9 @@ type Matcher struct {
 	Name  string
 	Types []ast.Node // the node types Match is offered, as in inspector filters
 	Match func(pass *analysis.Pass, cur inspector.Cursor) (Match, bool)
+
+	// ForTests marks a matcher whose whole point is test code.
+	ForTests bool
 }
 
 // matches returns the nodes of the package selected by m, in source order.

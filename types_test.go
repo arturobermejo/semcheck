@@ -45,7 +45,7 @@ func typeCheck(t *testing.T, src string, imp types.Importer) (*ast.File, *analys
 
 	fset := token.NewFileSet()
 
-	file, err := parser.ParseFile(fset, "p_test.go", src, parser.SkipObjectResolution)
+	file, err := parser.ParseFile(fset, "p.go", src, parser.SkipObjectResolution)
 	if err != nil {
 		t.Fatal(err)
 	}
