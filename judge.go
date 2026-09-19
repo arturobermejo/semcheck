@@ -1,0 +1,57 @@
+package semcheck
+
+import (
+	"context"
+	"fmt"
+	"math"
+)
+
+// A Question is a closed question about a piece of code.
+type Question struct {
+	Rule     string   // the name of the rule that asks
+	Ask      string   // the question, answerable with yes or no
+	Fragment string   // the code it is about
+	Types    []string // "name: type" notes on the variables the code uses
+}
+
+// A Decision is the answer to a Question.
+type Decision struct {
+	// Yes is the probability, from 0 to 1, that the answer is yes.
+	Yes float64
+}
+
+// A Judge answers closed questions about code. The decision model behind
+// semcheck is one; so is the FakeJudge used in tests.
+//
+// Decide takes a batch because a model answers many questions in one request
+// far faster than in many. It returns one Decision per Question, in the same
+// order, or an error if it could not answer.
+type Judge interface {
+	Decide(ctx context.Context, questions []Question) ([]Decision, error)
+}
+
+// consult asks the judge and checks what comes back. A Judge is code from
+// outside, or a model behind a network: its answers are input, not facts.
+func consult(ctx context.Context, judge Judge, questions []Question) ([]Decision, error) {
+	if len(questions) == 0 {
+		return nil, nil
+	}
+
+	decisions, err := judge.Decide(ctx, questions)
+	if err != nil {
+		return nil, fmt.Errorf("semcheck: the judge failed: %w", err)
+	}
+
+	if len(decisions) != len(questions) {
+		return nil, fmt.Errorf("semcheck: the judge gave %d decisions for %d questions", len(decisions), len(questions))
+	}
+
+	for i, d := range decisions {
+		// NaN fails every comparison, so it needs a check of its own.
+		if math.IsNaN(d.Yes) || d.Yes < 0 || d.Yes > 1 {
+			return nil, fmt.Errorf("semcheck: the judge gave the probability %v to question %d (rule %s)", d.Yes, i+1, questions[i].Rule)
+		}
+	}
+
+	return decisions, nil
+}
