@@ -13,8 +13,6 @@ func TestAnalyzerValid(t *testing.T) {
 	}
 }
 
-// TestAnalyzer runs the analyzer on the packages under testdata/src and
-// compares its diagnostics with the "// want" comments in those files.
 func TestAnalyzer(t *testing.T) {
 	analysistest.Run(t, analysistest.TestData(), Analyzer, "funcs", "nofuncs", "generated")
 }

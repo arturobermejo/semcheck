@@ -10,8 +10,6 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-// TestPluginRegistered goes through the registry, the same way golangci-lint
-// does: it knows the plugin by name only.
 func TestPluginRegistered(t *testing.T) {
 	newPlugin, err := register.GetPlugin(PluginName)
 	if err != nil {
@@ -41,9 +39,6 @@ func TestPluginRegistered(t *testing.T) {
 	}
 }
 
-// TestGolangciLintVersionsMatch guards a duplication that cannot be removed:
-// the plugin is compiled against one exact golangci-lint version, and the
-// Makefile installs the binary that performs that build.
 func TestGolangciLintVersionsMatch(t *testing.T) {
 	versionIn := func(file, pattern string) string {
 		t.Helper()

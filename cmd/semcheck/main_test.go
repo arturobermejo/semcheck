@@ -10,18 +10,12 @@ import (
 	"testing"
 )
 
-// childEnv marks a process that must behave as the semcheck command instead
-// of as the test binary.
+// childEnv makes the test binary behave as the semcheck command.
 const childEnv = "SEMCHECK_TEST_RUN_MAIN"
 
-// TestMain lets the test binary play two roles. Run by "go test", it runs the
-// tests. Re-executed by those tests with childEnv set, it becomes the command
-// itself: same main, same flags, same exit codes.
-//
-// Building the command with "go build" from the tests would work too, but the
-// test cache cannot see that dependency: after a change in the analyzer,
-// "go test" would happily report a cached "ok". Calling main from here makes
-// the dependency part of the test binary.
+// The tests re-execute the test binary instead of building the command: a
+// "go build" at run time is invisible to the test cache, which would report a
+// cached "ok" after a change in the analyzer.
 func TestMain(m *testing.M) {
 	if os.Getenv(childEnv) == "1" {
 		main() // never returns: singlechecker.Main ends in os.Exit
@@ -30,8 +24,6 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-// command returns the path of an executable that behaves as the command: the
-// test binary itself, provided childEnv is set in its environment.
 func command(t *testing.T) string {
 	t.Helper()
 
@@ -43,13 +35,10 @@ func command(t *testing.T) string {
 	return exe
 }
 
-// childEnviron is the current environment plus childEnv. It is inherited by
-// grandchildren too, which is how the binary that go vet starts knows its role.
 func childEnviron() []string {
 	return append(os.Environ(), childEnv+"=1")
 }
 
-// result is what a process leaves behind: two streams and an exit code.
 type result struct {
 	stdout, stderr string
 	exitCode       int
