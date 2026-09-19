@@ -160,9 +160,17 @@ func check(pass *analysis.Pass, cfg *Config, matchers []*Matcher, judge Judge, o
 		}
 	}
 
-	// Drivers print diagnostics in the order they are reported.
+	// Drivers print diagnostics in the order they are reported. By file name
+	// first: drivers parse files in parallel, and which one gets the lower
+	// positions changes from run to run.
+	fileName := func(pos token.Pos) string { return pass.Fset.File(pos).Name() }
+
 	slices.SortStableFunc(findings, func(a, b finding) int {
-		return cmp.Or(cmp.Compare(a.pos, b.pos), cmp.Compare(a.rule.Name, b.rule.Name))
+		return cmp.Or(
+			cmp.Compare(fileName(a.pos), fileName(b.pos)),
+			cmp.Compare(a.pos, b.pos),
+			cmp.Compare(a.rule.Name, b.rule.Name),
+		)
 	})
 
 	for _, f := range findings {

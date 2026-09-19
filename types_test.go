@@ -43,11 +43,27 @@ func fakePackage(path, name string, typeNames ...string) *types.Package {
 func typeCheck(t *testing.T, src string, imp types.Importer) (*ast.File, *analysis.Pass) {
 	t.Helper()
 
+	pass := typeCheckFiles(t, imp, [2]string{"p.go", src})
+
+	return pass.Files[0], pass
+}
+
+// typeCheckFiles builds a package out of {name, source} pairs, which get their
+// positions in the order given.
+func typeCheckFiles(t *testing.T, imp types.Importer, sources ...[2]string) *analysis.Pass {
+	t.Helper()
+
 	fset := token.NewFileSet()
 
-	file, err := parser.ParseFile(fset, "p.go", src, parser.ParseComments|parser.SkipObjectResolution)
-	if err != nil {
-		t.Fatal(err)
+	var files []*ast.File
+
+	for _, source := range sources {
+		file, err := parser.ParseFile(fset, source[0], source[1], parser.ParseComments|parser.SkipObjectResolution)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		files = append(files, file)
 	}
 
 	info := &types.Info{
@@ -58,10 +74,10 @@ func typeCheck(t *testing.T, src string, imp types.Importer) (*ast.File, *analys
 
 	conf := types.Config{Importer: imp}
 
-	pkg, err := conf.Check("p", fset, []*ast.File{file}, info)
+	pkg, err := conf.Check("p", fset, files, info)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	return file, &analysis.Pass{Fset: fset, Files: []*ast.File{file}, Pkg: pkg, TypesInfo: info}
+	return &analysis.Pass{Fset: fset, Files: files, Pkg: pkg, TypesInfo: info}
 }

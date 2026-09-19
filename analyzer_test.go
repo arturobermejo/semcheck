@@ -3,6 +3,7 @@ package semcheck
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"slices"
 	"strings"
@@ -129,6 +130,13 @@ func runOn(t *testing.T, a *analysis.Analyzer, src string) ([]analysis.Diagnosti
 	t.Helper()
 
 	_, pass := typeCheck(t, src, nil)
+
+	return runPass(t, a, pass)
+}
+
+func runPass(t *testing.T, a *analysis.Analyzer, pass *analysis.Pass) ([]analysis.Diagnostic, error) {
+	t.Helper()
+
 	pass.Analyzer = a
 	pass.ResultOf = map[*analysis.Analyzer]any{inspect.Analyzer: inspector.New(pass.Files)}
 
@@ -139,6 +147,36 @@ func runOn(t *testing.T, a *analysis.Analyzer, src string) ([]analysis.Diagnosti
 	_, err := a.Run(pass)
 
 	return diagnostics, err
+}
+
+// Drivers parse the files of a package in parallel, so which file gets the
+// lower positions changes from run to run.
+func TestFindingsAreOrderedByFile(t *testing.T) {
+	a, err := NewAnalyzer(&Config{Rules: []Rule{logRule()}}, &FakeJudge{Answer: func(Question) float64 { return 1 }})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pass := typeCheckFiles(t, nil,
+		[2]string{"b.go", "package p\n\nfunc b() {\n\tlogf(\"b1\")\n\tlogf(\"b2\")\n}\n"},
+		[2]string{"a.go", "package p\n\nfunc logf(string) {}\n\nfunc a() { logf(\"a\") }\n"},
+	)
+
+	diagnostics, err := runPass(t, a, pass)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var got []string
+
+	for _, d := range diagnostics {
+		position := pass.Fset.Position(d.Pos)
+		got = append(got, fmt.Sprintf("%s:%d", position.Filename, position.Line))
+	}
+
+	if want := []string{"a.go:5", "b.go:4", "b.go:5"}; !slices.Equal(got, want) {
+		t.Errorf("findings at %v, want %v", got, want)
+	}
 }
 
 func logRule() Rule {
