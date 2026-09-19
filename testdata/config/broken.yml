@@ -1,0 +1,4 @@
+rules:
+  - name: r
+    ask: q
+    min_confidnce: 0.5

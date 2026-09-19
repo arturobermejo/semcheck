@@ -1,0 +1,21 @@
+# A configuration with every form the fields can take.
+rules:
+  - name: no-pii-in-logs
+    match: { call: ["log.*", "slog.*"] }
+    ask: "Does this log include personal data (email, ID number, phone, full name, card)?"
+    report_if: yes
+    min_confidence: 0.95
+    context: statement
+    severity: error
+
+  - name: doc-matches-code
+    match: exported-func-doc
+    ask: "Does the comment describe what the function does?"
+    report_if: no
+
+  - name: name-matches-behavior
+    match:
+      func-prefix:
+        - Get
+        - Is
+    ask: "Does this function modify state although its name suggests it only reads?"
