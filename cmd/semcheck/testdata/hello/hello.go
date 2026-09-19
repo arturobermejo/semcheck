@@ -1,11 +1,15 @@
-// Package hello is a fixture with two function declarations and a literal.
+// Package hello is a fixture with two documented exported functions.
 package hello
 
 // Hello greets.
 func Hello() string { return "hi" }
 
-type greeter struct{}
+type Greeter struct{}
 
-func (greeter) greet() string { return Hello() }
+// Greet greets too.
+func (Greeter) Greet() string { return Hello() }
 
-var shout = func() string { return "HI" }
+func Shout() string { return "HI" }
+
+// whisper is documented but not exported.
+func whisper() string { return "hi" }
