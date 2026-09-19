@@ -1,0 +1,4 @@
+rules:
+  - name: r
+    match: http-handler
+    ask: q

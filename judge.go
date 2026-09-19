@@ -39,17 +39,17 @@ func consult(ctx context.Context, judge Judge, questions []Question) ([]Decision
 
 	decisions, err := judge.Decide(ctx, questions)
 	if err != nil {
-		return nil, fmt.Errorf("semcheck: the judge failed: %w", err)
+		return nil, fmt.Errorf("the judge failed: %w", err)
 	}
 
 	if len(decisions) != len(questions) {
-		return nil, fmt.Errorf("semcheck: the judge gave %d decisions for %d questions", len(decisions), len(questions))
+		return nil, fmt.Errorf("the judge gave %d decisions for %d questions", len(decisions), len(questions))
 	}
 
 	for i, d := range decisions {
 		// NaN fails every comparison, so it needs a check of its own.
 		if math.IsNaN(d.Yes) || d.Yes < 0 || d.Yes > 1 {
-			return nil, fmt.Errorf("semcheck: the judge gave the probability %v to question %d (rule %s)", d.Yes, i+1, questions[i].Rule)
+			return nil, fmt.Errorf("the judge gave the probability %v to question %d (rule %s)", d.Yes, i+1, questions[i].Rule)
 		}
 	}
 

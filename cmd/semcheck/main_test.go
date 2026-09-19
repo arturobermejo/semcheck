@@ -8,6 +8,8 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+
+	"github.com/arturobermejo/semcheck"
 )
 
 // childEnv makes the test binary behave as the semcheck command.
@@ -35,8 +37,10 @@ func command(t *testing.T) string {
 	return exe
 }
 
+// The child answers every question with the same probability: what is under
+// test is the command, not the rules.
 func childEnviron() []string {
-	return append(os.Environ(), childEnv+"=1")
+	return append(os.Environ(), childEnv+"=1", semcheck.JudgeEnv+"=fake:0.95")
 }
 
 type result struct {
@@ -47,10 +51,16 @@ type result struct {
 func run(t *testing.T, name string, args ...string) result {
 	t.Helper()
 
+	return runWith(t, childEnviron(), name, args...)
+}
+
+func runWith(t *testing.T, env []string, name string, args ...string) result {
+	t.Helper()
+
 	var stdout, stderr bytes.Buffer
 
 	cmd := exec.Command(name, args...)
-	cmd.Env = childEnviron()
+	cmd.Env = env
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
@@ -67,13 +77,10 @@ func run(t *testing.T, name string, args ...string) result {
 // wantDiagnostics are the findings for testdata/hello, without the directory
 // part of the path: standalone prints absolute paths and go vet relative ones.
 var wantDiagnostics = []string{
-	"hello.go:7:6: exported-func-doc: matched",
-	"hello.go:12:16: exported-func-doc: matched",
-	"hello.go:14:16: func-prefix: matched",
-	"hello.go:17:16: exported-func-doc: matched",
-	"hello.go:17:16: func-prefix: matched",
-	"hello.go:20:2: call: matched",
-	"hello_test.go:5:6: test-func: matched",
+	"hello.go:14:16: name-matches-behavior: the name suggests that the function only reads (0.95)",
+	"hello.go:17:16: name-matches-behavior: the name suggests that the function only reads (0.95)",
+	"hello.go:20:2: no-pii-in-logs: this log includes personal data (0.95)",
+	"hello_test.go:5:6: test-name-matches: the name does not say what the test checks (0.95)",
 }
 
 func checkDiagnostics(t *testing.T, output string) {
@@ -92,7 +99,7 @@ func checkDiagnostics(t *testing.T, output string) {
 }
 
 func TestStandaloneFindings(t *testing.T) {
-	got := run(t, command(t), "./testdata/hello")
+	got := run(t, command(t), "-config=testdata/.semcheck.yml", "./testdata/hello")
 
 	if got.exitCode != 3 {
 		t.Errorf("exit code = %d, want 3", got.exitCode)
@@ -106,7 +113,7 @@ func TestStandaloneFindings(t *testing.T) {
 }
 
 func TestStandaloneClean(t *testing.T) {
-	got := run(t, command(t), "./testdata/clean")
+	got := run(t, command(t), "-config=testdata/.semcheck.yml", "./testdata/clean")
 
 	if got != (result{}) {
 		t.Errorf("got %+v, want no output and exit code 0", got)
@@ -114,7 +121,7 @@ func TestStandaloneClean(t *testing.T) {
 }
 
 func TestStandaloneLoadError(t *testing.T) {
-	got := run(t, command(t), "./testdata/does-not-exist")
+	got := run(t, command(t), "-config=testdata/.semcheck.yml", "./testdata/does-not-exist")
 
 	if got.exitCode != 1 {
 		t.Errorf("exit code = %d, want 1", got.exitCode)
@@ -126,7 +133,7 @@ func TestStandaloneLoadError(t *testing.T) {
 }
 
 func TestStandaloneJSON(t *testing.T) {
-	got := run(t, command(t), "-json", "./testdata/hello")
+	got := run(t, command(t), "-json", "-config=testdata/.semcheck.yml", "./testdata/hello")
 
 	if got.exitCode != 0 {
 		t.Errorf("exit code = %d, want 0: -json never fails on findings", got.exitCode)
@@ -183,4 +190,49 @@ func TestVetTool(t *testing.T) {
 	}
 
 	checkDiagnostics(t, strings.Join(findings, ""))
+}
+
+func TestStandaloneConfigErrors(t *testing.T) {
+	tests := []struct {
+		name   string
+		config string
+		want   string
+	}{
+		{"a file that does not exist", "testdata/missing.yml", "testdata/missing.yml"},
+		{"a file with invalid rules", "testdata/invalid.yml", `rule #1 "r": match: unknown matcher "http-handler"`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := run(t, command(t), "-config="+tt.config, "./testdata/hello")
+
+			if got.exitCode != 1 {
+				t.Errorf("exit code = %d, want 1: nothing could be analyzed", got.exitCode)
+			}
+
+			if !strings.Contains(got.stderr, tt.want) {
+				t.Errorf("stderr does not mention %q:\n%s", tt.want, got.stderr)
+			}
+
+			if strings.Contains(got.stderr, "semcheck: semcheck:") {
+				t.Errorf("the prefix shows twice:\n%s", got.stderr)
+			}
+		})
+	}
+}
+
+func TestStandaloneWithoutModel(t *testing.T) {
+	env := append(os.Environ(), childEnv+"=1", semcheck.JudgeEnv+"=")
+
+	got := runWith(t, env, command(t), "-config=testdata/.semcheck.yml", "./testdata/hello")
+
+	if got.exitCode != 1 || !strings.Contains(got.stderr, semcheck.JudgeEnv) {
+		t.Errorf("got %+v, want exit code 1 and a hint about %s", got, semcheck.JudgeEnv)
+	}
+
+	// A package without anything to ask about does not need a model.
+	got = runWith(t, env, command(t), "-config=testdata/.semcheck.yml", "./testdata/clean")
+	if got != (result{}) {
+		t.Errorf("got %+v, want no output and exit code 0", got)
+	}
 }

@@ -63,11 +63,11 @@ func fragment(pass *analysis.Pass, m Match, ctx Context) (string, error) {
 
 	var buf bytes.Buffer
 	if err := format.Node(&buf, pass.Fset, &printer.CommentedNode{Node: node, Comments: comments}); err != nil {
-		return "", fmt.Errorf("semcheck: printing the code at %s: %w", pass.Fset.Position(node.Pos()), err)
+		return "", fmt.Errorf("printing the code at %s: %w", pass.Fset.Position(node.Pos()), err)
 	}
 
 	if buf.Len() > maxFragmentBytes {
-		return "", fmt.Errorf("semcheck: the code at %s takes %d bytes: %w", pass.Fset.Position(node.Pos()), buf.Len(), errFragmentTooLarge)
+		return "", fmt.Errorf("the code at %s takes %d bytes: %w", pass.Fset.Position(node.Pos()), buf.Len(), errFragmentTooLarge)
 	}
 
 	return buf.String(), nil

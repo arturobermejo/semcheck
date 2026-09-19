@@ -1,0 +1,6 @@
+# Found by the tests that look for a configuration from a directory below.
+rules:
+  - name: found-upwards
+    match: { call: ["p.logf"] }
+    ask: "Does this log include personal data?"
+    context: statement

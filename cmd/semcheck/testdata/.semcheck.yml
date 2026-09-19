@@ -1,0 +1,24 @@
+# The rules of the end-to-end tests of the command. The judge is the fake one
+# of SEMCHECK_JUDGE, which gives the same answer to every question.
+rules:
+  - name: no-pii-in-logs
+    match: { call: ["log.*"] }
+    ask: "Does this log include personal data?"
+    message: this log includes personal data
+    context: statement
+
+  - name: name-matches-behavior
+    match: { func-prefix: [Get, Is, Has] }
+    ask: "Does this function modify state although its name suggests it only reads?"
+    message: the name suggests that the function only reads
+
+  # A rule that reports "no" finds nothing when every answer is "yes".
+  - name: doc-matches-code
+    match: exported-func-doc
+    ask: "Does the comment describe what the function does?"
+    report_if: no
+
+  - name: test-name-matches
+    match: test-func
+    ask: "Does the name of the test differ from what it checks?"
+    message: the name does not say what the test checks

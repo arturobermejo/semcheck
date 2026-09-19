@@ -9,16 +9,8 @@ import (
 	"golang.org/x/tools/go/analysis/passes/inspect"
 )
 
-// Analyzer is a provisional analysis that reports every node the matchers
-// select. The binary and the plugin use it until they can load a configuration
-// and reach a judge; the real analysis is built by NewAnalyzer.
-var Analyzer = newMatchAnalyzer(
-	must(MatchSpec{Matcher: "exported-func-doc"}.matcher()),
-	must(MatchSpec{Matcher: "func-prefix", Args: []string{"Get", "Is", "Has", "Find", "List"}}.matcher()),
-	must(MatchSpec{Matcher: "test-func"}.matcher()),
-	must(MatchSpec{Matcher: "call", Args: []string{"log.*", "slog.*", "zap.*", "zerolog.*"}}.matcher()),
-)
-
+// newMatchAnalyzer returns an analysis that reports every node the matchers
+// select, to test them without rules or a judge.
 func newMatchAnalyzer(matchers ...*Matcher) *analysis.Analyzer {
 	return &analysis.Analyzer{
 		Name:     "semcheck",
