@@ -119,30 +119,38 @@ func TestCallPatternMatches(t *testing.T) {
 	}
 }
 
-// describeFunc names the function around a match, which the regular match
-// analyzer does not report.
-func describeFunc(pass *analysis.Pass, fn ast.Node) string {
-	switch fn := fn.(type) {
+// describe spells out the function and the statement around a match, which
+// the regular match analyzer does not report.
+func describe(pass *analysis.Pass, m Match) string {
+	var where string
+
+	switch fn := m.Func.(type) {
 	case nil:
-		return "package level"
+		where = "package level"
 	case *ast.FuncDecl:
-		return "in " + fn.Name.Name
+		where = "in " + fn.Name.Name
 	default:
-		return fmt.Sprintf("in the literal of line %d", pass.Fset.Position(fn.Pos()).Line)
+		where = fmt.Sprintf("in the literal of line %d", pass.Fset.Position(fn.Pos()).Line)
 	}
+
+	if m.Stmt == nil {
+		return where + ", no statement"
+	}
+
+	return fmt.Sprintf("%s, %T", where, m.Stmt)
 }
 
-func TestMatchFunc(t *testing.T) {
+func TestMatchSurroundings(t *testing.T) {
 	m := must(callTo("log.*"))
 
 	a := &analysis.Analyzer{
 		Name:     "enclosing",
-		Doc:      "reports the function around each match",
+		Doc:      "reports the function and the statement around each match",
 		Requires: []*analysis.Analyzer{inspect.Analyzer},
 		Run: func(pass *analysis.Pass) (any, error) {
 			for _, m := range []*Matcher{m, exportedFuncDoc} {
 				for _, match := range m.matches(pass) {
-					pass.Reportf(match.Pos, "%s", describeFunc(pass, match.Func))
+					pass.Reportf(match.Pos, "%s", describe(pass, match))
 				}
 			}
 

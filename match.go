@@ -17,6 +17,9 @@ type Match struct {
 	// Func is the innermost *ast.FuncDecl or *ast.FuncLit that contains Node,
 	// or Node itself if it is one. It is nil for nodes at package level.
 	Func ast.Node
+
+	// Stmt is the innermost statement that contains Node, or nil.
+	Stmt ast.Stmt
 }
 
 // A Matcher selects, deterministically, the nodes a rule asks about.
@@ -41,6 +44,7 @@ func (m *Matcher) matches(pass *analysis.Pass) []Match {
 		for cur := range fileCur.Preorder(m.Types...) {
 			if match, ok := m.Match(pass, cur); ok {
 				match.Func = enclosingFunc(cur)
+				match.Stmt = enclosingStmt(cur)
 				found = append(found, match)
 			}
 		}
@@ -52,6 +56,16 @@ func (m *Matcher) matches(pass *analysis.Pass) []Match {
 func enclosingFunc(cur inspector.Cursor) ast.Node {
 	for c := range cur.Enclosing((*ast.FuncDecl)(nil), (*ast.FuncLit)(nil)) {
 		return c.Node()
+	}
+
+	return nil
+}
+
+func enclosingStmt(cur inspector.Cursor) ast.Stmt {
+	for c := range cur.Enclosing() {
+		if stmt, ok := c.Node().(ast.Stmt); ok {
+			return stmt
+		}
 	}
 
 	return nil
