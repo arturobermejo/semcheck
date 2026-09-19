@@ -15,6 +15,7 @@ var Analyzer = newMatchAnalyzer(
 	exportedFuncDoc,
 	must(funcPrefix("Get", "Is", "Has", "Find", "List")),
 	testFunc,
+	must(callTo("log.*", "slog.*", "zap.*", "zerolog.*")),
 )
 
 func newMatchAnalyzer(matchers ...*Matcher) *analysis.Analyzer {

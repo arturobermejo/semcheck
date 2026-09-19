@@ -67,11 +67,12 @@ func run(t *testing.T, name string, args ...string) result {
 // wantDiagnostics are the findings for testdata/hello, without the directory
 // part of the path: standalone prints absolute paths and go vet relative ones.
 var wantDiagnostics = []string{
-	"hello.go:5:6: exported-func-doc: matched",
-	"hello.go:10:16: exported-func-doc: matched",
-	"hello.go:12:16: func-prefix: matched",
-	"hello.go:15:16: exported-func-doc: matched",
-	"hello.go:15:16: func-prefix: matched",
+	"hello.go:7:6: exported-func-doc: matched",
+	"hello.go:12:16: exported-func-doc: matched",
+	"hello.go:14:16: func-prefix: matched",
+	"hello.go:17:16: exported-func-doc: matched",
+	"hello.go:17:16: func-prefix: matched",
+	"hello.go:20:2: call: matched",
 	"hello_test.go:5:6: test-func: matched",
 }
 

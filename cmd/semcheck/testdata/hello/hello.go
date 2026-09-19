@@ -1,6 +1,8 @@
 // Package hello is a fixture with nodes for two matchers.
 package hello
 
+import "log"
+
 // Hello greets.
 func Hello() string { return "hi" }
 
@@ -14,7 +16,11 @@ func (Greeter) IsPolite() bool { return true }
 // HasName is selected by both matchers.
 func (Greeter) HasName() bool { return false }
 
-func Shout() string { return "HI" }
+func Shout() string {
+	log.Printf("shouting %s", "HI")
+
+	return "HI"
+}
 
 // whisper is documented but not exported.
 func whisper() string { return "hi" }
