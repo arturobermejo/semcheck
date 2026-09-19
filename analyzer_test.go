@@ -3,6 +3,7 @@ package semcheck
 import (
 	"context"
 	"errors"
+	"math"
 	"slices"
 	"strings"
 	"testing"
@@ -196,17 +197,115 @@ func TestAnalyzerQuestions(t *testing.T) {
 	}
 }
 
+// analyzerWithWarnings builds the analyzer of the standalone command, with its
+// warnings kept instead of written to the standard error.
+func analyzerWithWarnings(t *testing.T, cfg *Config, judge Judge) (*analysis.Analyzer, *[]string) {
+	t.Helper()
+
+	var warnings []string
+
+	a, err := newAnalyzer(cfg, judge, options{honorNolint: true, warn: func(msg string) { warnings = append(warnings, msg) }})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return a, &warnings
+}
+
 func TestAnalyzerJudgeFails(t *testing.T) {
 	boom := errors.New("rate limited")
 
-	diagnostics, err := runOn(t, mustAnalyzer(t, &Config{Rules: []Rule{logRule()}}, &FakeJudge{Err: boom}), checkedSource)
-	if !errors.Is(err, boom) {
-		t.Errorf("error = %v, want one that wraps %v", err, boom)
+	t.Run("by default it is a warning", func(t *testing.T) {
+		a, warnings := analyzerWithWarnings(t, &Config{Rules: []Rule{logRule()}}, &FakeJudge{Err: boom})
+
+		diagnostics, err := runOn(t, a, checkedSource)
+		if err != nil || len(diagnostics) != 0 {
+			t.Fatalf("got %v, %v; want no diagnostics and no error", diagnostics, err)
+		}
+
+		if want := []string{"p: 2 of 2 questions were not answered: the judge failed: rate limited"}; !slices.Equal(*warnings, want) {
+			t.Errorf("warnings = %q, want %q", *warnings, want)
+		}
+	})
+
+	t.Run("fail_on_judge_error makes it an error", func(t *testing.T) {
+		a, warnings := analyzerWithWarnings(t, &Config{Rules: []Rule{logRule()}, FailOnJudgeError: true}, &FakeJudge{Err: boom})
+
+		diagnostics, err := runOn(t, a, checkedSource)
+		if !errors.Is(err, boom) || !strings.Contains(err.Error(), "2 of 2 questions") {
+			t.Errorf("error = %v, want one about 2 of 2 questions that wraps %v", err, boom)
+		}
+
+		if len(diagnostics) != 0 || len(*warnings) != 0 {
+			t.Errorf("got diagnostics %v and warnings %q along with the error", diagnostics, *warnings)
+		}
+	})
+}
+
+// Drivers that cache results say so in the warning.
+func TestAnalyzerWarnsAboutStaleCaches(t *testing.T) {
+	var warnings []string
+
+	a, err := newAnalyzer(&Config{Rules: []Rule{logRule()}}, &FakeJudge{Err: errors.New("down")}, options{
+		warn:      func(msg string) { warnings = append(warnings, msg) },
+		staleHint: ". run cache clean",
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	if len(diagnostics) != 0 {
-		t.Errorf("diagnostics came along with the error: %v", diagnostics)
+	if _, err := runOn(t, a, checkedSource); err != nil {
+		t.Fatal(err)
 	}
+
+	if want := []string{"p: 2 of 2 questions were not answered: the judge failed: down. run cache clean"}; !slices.Equal(warnings, want) {
+		t.Errorf("warnings = %q, want %q", warnings, want)
+	}
+}
+
+// A judge may fail for one question and answer the rest.
+func TestAnalyzerJudgeFailsForOneQuestion(t *testing.T) {
+	refused := errors.New("the model refused this fragment")
+
+	judge := judgeFunc(func(qs []Question) ([]Decision, error) {
+		ds := make([]Decision, len(qs))
+
+		for i, q := range qs {
+			if strings.Contains(q.Fragment, "done") {
+				// Its Yes must not be looked at, whatever it holds.
+				ds[i] = Decision{Yes: math.NaN(), Err: refused}
+			} else {
+				ds[i].Yes = 1
+			}
+		}
+
+		return ds, nil
+	})
+
+	t.Run("the others are reported", func(t *testing.T) {
+		a, warnings := analyzerWithWarnings(t, &Config{Rules: []Rule{logRule()}}, judge)
+
+		diagnostics, err := runOn(t, a, checkedSource)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if len(diagnostics) != 1 {
+			t.Errorf("got %d diagnostics, want the one that was answered", len(diagnostics))
+		}
+
+		if want := []string{"p: 1 of 2 questions were not answered: the model refused this fragment"}; !slices.Equal(*warnings, want) {
+			t.Errorf("warnings = %q, want %q", *warnings, want)
+		}
+	})
+
+	t.Run("fail_on_judge_error counts them too", func(t *testing.T) {
+		a, _ := analyzerWithWarnings(t, &Config{Rules: []Rule{logRule()}, FailOnJudgeError: true}, judge)
+
+		if _, err := runOn(t, a, checkedSource); !errors.Is(err, refused) {
+			t.Errorf("error = %v, want one that wraps %v", err, refused)
+		}
+	})
 }
 
 func TestAnalyzerNothingToAsk(t *testing.T) {
@@ -228,13 +327,20 @@ func TestAnalyzerSkipsHugeFragments(t *testing.T) {
 	src := "package p\n\nfunc logf(args ...any) {}\n\nfunc big(x int) {\n\tlogf(x)\n" + strings.Repeat("\tx = x + 100\n", maxFragmentBytes/13) + "}\n\nfunc small(x int) {\n\tlogf(x)\n}\n"
 
 	judge := &FakeJudge{}
-	if _, err := runOn(t, mustAnalyzer(t, &Config{Rules: []Rule{r}}, judge), src); err != nil {
+
+	// Not the judge's fault: not an error even with fail_on_judge_error.
+	a, warnings := analyzerWithWarnings(t, &Config{Rules: []Rule{r}, FailOnJudgeError: true}, judge)
+	if _, err := runOn(t, a, src); err != nil {
 		t.Fatal(err)
 	}
 
 	qs := judge.Questions()
 	if len(qs) != 1 || !strings.HasPrefix(qs[0].Fragment, "func small") {
 		t.Errorf("got %d questions, want only the one about small", len(qs))
+	}
+
+	if want := []string{"p: 1 fragments too large to ask about, the first at p.go:6:2"}; !slices.Equal(*warnings, want) {
+		t.Errorf("warnings = %q, want %q", *warnings, want)
 	}
 }
 

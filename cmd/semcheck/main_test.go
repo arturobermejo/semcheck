@@ -232,10 +232,11 @@ func TestStandaloneWithoutModel(t *testing.T) {
 		t.Errorf("got %+v, want exit code 1 and a hint about %s", got, semcheck.JudgeEnv)
 	}
 
-	// A package without anything to ask about does not need a model.
+	// Even for a package with nothing to ask about: a run that could not have
+	// reached a model must not look like a clean one.
 	got = runWith(t, env, command(t), "-config=testdata/.semcheck.yml", "./testdata/clean")
-	if got != (result{}) {
-		t.Errorf("got %+v, want no output and exit code 0", got)
+	if got.exitCode != 1 {
+		t.Errorf("exit code = %d, want 1", got.exitCode)
 	}
 }
 
@@ -258,5 +259,29 @@ func TestStandaloneNolint(t *testing.T) {
 
 	if reported := strings.Join(labels, ""); reported != "ACEHIOSUW" {
 		t.Errorf("reported %s, want ACEHIOSUW:\n%s", reported, got.stderr)
+	}
+}
+
+// A judge that fails is a warning, and the build stays green; unless the
+// configuration asks otherwise.
+func TestStandaloneJudgeFails(t *testing.T) {
+	env := append(os.Environ(), childEnv+"=1", semcheck.JudgeEnv+"=broken")
+
+	got := runWith(t, env, command(t), "-config=testdata/.semcheck.yml", "./testdata/hello")
+
+	if got.exitCode != 0 || got.stdout != "" {
+		t.Errorf("got exit code %d and stdout %q, want 0 and nothing", got.exitCode, got.stdout)
+	}
+
+	for _, want := range []string{"semcheck: warning: ", "testdata/hello", "questions were not answered", "broken on purpose"} {
+		if !strings.Contains(got.stderr, want) {
+			t.Errorf("stderr does not mention %q:\n%s", want, got.stderr)
+		}
+	}
+
+	got = runWith(t, env, command(t), "-config=testdata/strict.yml", "./testdata/hello")
+
+	if got.exitCode != 1 || !strings.Contains(got.stderr, "broken on purpose") || strings.Contains(got.stderr, "warning") {
+		t.Errorf("with fail_on_judge_error: got %+v, want exit code 1 and an error, not a warning", got)
 	}
 }

@@ -163,7 +163,7 @@ func TestNolintAboveThePackageClause(t *testing.T) {
 func TestPluginLeavesNolintToGolangciLint(t *testing.T) {
 	judge := &FakeJudge{Answer: func(Question) float64 { return 1 }}
 
-	a, err := newAnalyzer(&Config{Rules: []Rule{logRule()}}, judge, false)
+	a, err := newAnalyzer(&Config{Rules: []Rule{logRule()}}, judge, options{})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -25,7 +25,7 @@ func TestValidate(t *testing.T) {
 	}{
 		{"nothing wrong", func(r *Rule) {}, ""},
 		{"every optional value", func(r *Rule) {
-			r.ReportIf, r.MinConfidence, r.Context, r.Severity = AnswerNo, 1, ContextFunction, "warning"
+			r.ReportIf, r.MinConfidence, r.Context = AnswerNo, 1, ContextFunction
 		}, ""},
 		{"name with digits, dashes and underscores", func(r *Rule) { r.Name = "No_PII-in-logs2" }, ""},
 
@@ -40,7 +40,6 @@ func TestValidate(t *testing.T) {
 		{"negative confidence", func(r *Rule) { r.MinConfidence = -0.5 }, "not -0.5"},
 		{"confidence as a percentage", func(r *Rule) { r.MinConfidence = 90 }, "not 90"},
 		{"unknown context", func(r *Rule) { r.Context = "file" }, `context must be statement or function, not "file"`},
-		{"unknown severity", func(r *Rule) { r.Severity = "fatal" }, `severity must be error, warning or info, not "fatal"`},
 		{"no matcher", func(r *Rule) { r.Match = MatchSpec{} }, "match is required"},
 		{"unknown matcher", func(r *Rule) { r.Match = MatchSpec{Matcher: "http-handler"} }, `match: unknown matcher "http-handler" (the matchers are: call, exported-func-doc, func-prefix, test-func)`},
 		{"bad arguments for the matcher", func(r *Rule) { r.Match.Args = []string{"log"} }, `match: call: "log" must look like pkg.Func`},
@@ -119,7 +118,6 @@ func TestLoadConfigReportsEveryProblem(t *testing.T) {
 		`rule #2 "no-pii-in-logs": ask is required`,
 		`rule #2 "no-pii-in-logs": match: unknown matcher "http-handler"`,
 		`rule #3: name is required`,
-		`rule #3: severity must be error, warning or info, not "fatal"`,
 		`rule #3: context: statement has no effect with the matcher exported-func-doc`,
 	}
 

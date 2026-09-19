@@ -18,6 +18,10 @@ type Question struct {
 type Decision struct {
 	// Yes is the probability, from 0 to 1, that the answer is yes.
 	Yes float64
+
+	// Err, if set, says why this one question has no answer, when the judge
+	// could answer the others of the batch. Yes is then meaningless.
+	Err error
 }
 
 // A Judge answers closed questions about code. The decision model behind
@@ -47,6 +51,10 @@ func consult(ctx context.Context, judge Judge, questions []Question) ([]Decision
 	}
 
 	for i, d := range decisions {
+		if d.Err != nil {
+			continue
+		}
+
 		// NaN fails every comparison, so it needs a check of its own.
 		if math.IsNaN(d.Yes) || d.Yes < 0 || d.Yes > 1 {
 			return nil, fmt.Errorf("the judge gave the probability %v to question %d (rule %s)", d.Yes, i+1, questions[i].Rule)

@@ -12,4 +12,3 @@ rules:
   - match: { exported-func-doc: {} }
     ask: "Does the comment describe what the function does?"
     context: statement
-    severity: fatal

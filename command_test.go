@@ -66,10 +66,10 @@ func TestFindConfig(t *testing.T) {
 func TestDefaultJudge(t *testing.T) {
 	tests := []struct {
 		env  string
-		want float64 // the answer of the judge; -1 if it cannot answer
+		want float64 // the answer of the judge to every question
 		err  bool
 	}{
-		{"", -1, false},
+		{"", 0, true},
 		{"fake:0.95", 0.95, false},
 		{"fake:0", 0, false},
 		{"fake:1", 1, false},
@@ -78,6 +78,7 @@ func TestDefaultJudge(t *testing.T) {
 		{"fake:high", 0, true},
 		{"fake:", 0, true},
 		{"jev", 0, true},
+		{"broken:now", 0, true},
 	}
 
 	for _, tt := range tests {
@@ -99,10 +100,7 @@ func TestDefaultJudge(t *testing.T) {
 
 			decisions, err := judge.Decide(context.Background(), questions("a", "b"))
 
-			switch {
-			case tt.want < 0 && err == nil:
-				t.Error("the judge answered, want an error: there is no model yet")
-			case tt.want >= 0 && (err != nil || len(decisions) != 2 || decisions[1].Yes != tt.want):
+			if err != nil || len(decisions) != 2 || decisions[1].Yes != tt.want {
 				t.Errorf("Decide = %v, %v; want %v for every question", decisions, err, tt.want)
 			}
 		})
@@ -201,4 +199,17 @@ func TestCommandAnalyzer(t *testing.T) {
 			t.Errorf("error = %v, want one that wraps fs.ErrNotExist", err)
 		}
 	})
+}
+
+func TestDefaultJudgeBroken(t *testing.T) {
+	t.Setenv(JudgeEnv, "broken")
+
+	judge, err := DefaultJudge()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if decisions, err := judge.Decide(context.Background(), questions("a")); err == nil {
+		t.Errorf("Decide = %v, want an error", decisions)
+	}
 }

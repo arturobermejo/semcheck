@@ -1,7 +1,6 @@
 package semcheck
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -18,9 +17,9 @@ import (
 // ConfigFile is the name of the file FindConfig looks for.
 const ConfigFile = ".semcheck.yml"
 
-// JudgeEnv selects the judge of DefaultJudge. The only value so far is
-// "fake:<probability>", a judge that gives that answer to every question: for
-// trying semcheck out without a model.
+// JudgeEnv selects the judge of DefaultJudge, for trying semcheck out without a
+// model: "fake:<probability>" gives that answer to every question, and "broken"
+// fails every time.
 const JudgeEnv = "SEMCHECK_JUDGE"
 
 // Analyzer is the semcheck analysis for command-line drivers. Those parse the
@@ -116,18 +115,17 @@ func DefaultJudge() (Judge, error) {
 		return &FakeJudge{Answer: func(Question) float64 { return yes }}, nil
 	}
 
+	if value == "broken" {
+		return &FakeJudge{Err: errors.New("broken on purpose")}, nil
+	}
+
 	if value != "" {
 		return nil, fmt.Errorf("semcheck: %s=%s: unknown judge", JudgeEnv, value)
 	}
 
-	return unavailableJudge{}, nil
-}
-
-// unavailableJudge stands where the model will be.
-type unavailableJudge struct{}
-
-func (unavailableJudge) Decide(context.Context, []Question) ([]Decision, error) {
-	return nil, fmt.Errorf("there is no model yet: set %s=fake:0.95 to try semcheck out", JudgeEnv)
+	// Not a judge that fails when asked: that would be a warning, and a run
+	// that cannot reach any model must not pass for a clean one.
+	return nil, fmt.Errorf("semcheck: there is no model yet: set %s=fake:0.95 to try semcheck out", JudgeEnv)
 }
 
 // unprefixed is an error of the package API on its way through a driver, which

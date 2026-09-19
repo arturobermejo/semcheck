@@ -33,8 +33,8 @@ func TestFakeJudgeAnswers(t *testing.T) {
 		judge *FakeJudge
 		want  []Decision
 	}{
-		{"without a function every answer is a certain no", &FakeJudge{}, []Decision{{0}, {0}, {0}}},
-		{"one decision per question, in order", &FakeJudge{Answer: pii}, []Decision{{0.02}, {0.97}, {0.02}}},
+		{"without a function every answer is a certain no", &FakeJudge{}, []Decision{{Yes: 0}, {Yes: 0}, {Yes: 0}}},
+		{"one decision per question, in order", &FakeJudge{Answer: pii}, []Decision{{Yes: 0.02}, {Yes: 0.97}, {Yes: 0.02}}},
 	}
 
 	for _, tt := range tests {

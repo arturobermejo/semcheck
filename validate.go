@@ -5,14 +5,11 @@ import (
 	"fmt"
 	"go/ast"
 	"regexp"
-	"slices"
 	"strings"
 )
 
 // Rule names appear in diagnostics as "name: message".
 var ruleName = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_-]*$`)
-
-var severities = []string{"", "error", "warning", "info"}
 
 // Validate reports everything that is wrong with the configuration, not only
 // the first problem: fixing a file one error at a time is a waste of runs.
@@ -76,10 +73,6 @@ func (r Rule) problems() []error {
 
 	if r.Context != ContextStatement && r.Context != ContextFunction {
 		add("context must be statement or function, not %q", r.Context)
-	}
-
-	if !slices.Contains(severities, r.Severity) {
-		add("severity must be error, warning or info, not %q", r.Severity)
 	}
 
 	switch m, err := r.Match.matcher(); {

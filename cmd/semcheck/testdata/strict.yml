@@ -1,0 +1,9 @@
+# Like .semcheck.yml, for a team that prefers a red build to an unchecked one.
+fail_on_judge_error: true
+
+rules:
+  - name: no-pii-in-logs
+    match: { call: ["log.*"] }
+    ask: "Does this log include personal data?"
+    message: this log includes personal data
+    context: statement

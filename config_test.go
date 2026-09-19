@@ -22,7 +22,6 @@ func TestLoadConfig(t *testing.T) {
 			ReportIf:      AnswerYes,
 			MinConfidence: 0.95,
 			Context:       ContextStatement,
-			Severity:      "error",
 		},
 		{
 			Name:          "doc-matches-code",
@@ -200,7 +199,7 @@ func TestParseConfigDefaults(t *testing.T) {
 	}
 
 	r := cfg.Rules[0]
-	if r.ReportIf != AnswerYes || r.MinConfidence != 0.9 || r.Context != ContextFunction || r.Severity != "" {
+	if r.ReportIf != AnswerYes || r.MinConfidence != 0.9 || r.Context != ContextFunction {
 		t.Errorf("defaults = %+v", r)
 	}
 
@@ -210,6 +209,23 @@ func TestParseConfigDefaults(t *testing.T) {
 		cfg, err := parseConfig([]byte(src))
 		if err != nil || len(cfg.Rules) != 0 {
 			t.Errorf("parseConfig(%q) = %+v, %v", src, cfg, err)
+		}
+	}
+}
+
+func TestParseConfigFailOnJudgeError(t *testing.T) {
+	for src, want := range map[string]bool{
+		rule("    match: call\n"):                                  false,
+		"fail_on_judge_error: true\n" + rule("    match: call\n"):  true,
+		"fail_on_judge_error: false\n" + rule("    match: call\n"): false,
+	} {
+		cfg, err := parseConfig([]byte(src))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if cfg.FailOnJudgeError != want {
+			t.Errorf("fail_on_judge_error = %v, want %v for:\n%s", cfg.FailOnJudgeError, want, src)
 		}
 	}
 }

@@ -6,7 +6,6 @@ rules:
     report_if: yes
     min_confidence: 0.95
     context: statement
-    severity: error
 
   - name: doc-matches-code
     match: exported-func-doc

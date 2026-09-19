@@ -21,6 +21,11 @@ const (
 // A Config is the content of a .semcheck.yml file.
 type Config struct {
 	Rules []Rule `yaml:"rules"`
+
+	// FailOnJudgeError makes the analysis fail when the judge cannot answer.
+	// By default the questions are left unanswered, with a warning: a model
+	// that is down must not break every build.
+	FailOnJudgeError bool `yaml:"fail_on_judge_error"`
 }
 
 // A Rule asks a closed question about the nodes a matcher selects.
@@ -35,8 +40,7 @@ type Rule struct {
 	// MinConfidence is how sure the model must be of that answer, in (0, 1].
 	MinConfidence float64 `yaml:"min_confidence"`
 
-	Context  Context `yaml:"context"`
-	Severity string  `yaml:"severity"`
+	Context Context `yaml:"context"`
 
 	// Message is what a finding says. If empty, it is made from Ask.
 	Message string `yaml:"message"`

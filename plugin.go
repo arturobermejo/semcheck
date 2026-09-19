@@ -24,8 +24,8 @@ func init() {
 // Rules written there, instead of in a file of their own, have an advantage:
 // golangci-lint knows when they change, and forgets the results it has cached.
 type pluginSettings struct {
-	Config string `yaml:"config"`
-	Rules  []Rule `yaml:"rules"`
+	File   string `yaml:"config"`
+	Config `yaml:",inline"`
 }
 
 type plugin struct {
@@ -43,7 +43,13 @@ func newPlugin(settings any) (register.LinterPlugin, error) {
 		return nil, err
 	}
 
-	analyzer, err := newAnalyzer(cfg, judge, false)
+	analyzer, err := newAnalyzer(cfg, judge, options{
+		honorNolint: false,
+		// Seen, not assumed: after a judge failure that is only a warning,
+		// golangci-lint reports "0 issues" for that package, without asking
+		// again, until its code changes.
+		staleHint: ". golangci-lint will cache this as a package without findings: run \"golangci-lint cache clean\" once the judge is back, or set fail_on_judge_error",
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -67,17 +73,19 @@ func pluginConfig(settings any) (*Config, error) {
 		return nil, fmt.Errorf("semcheck: settings: %w", err)
 	}
 
+	inline := len(s.Rules) > 0 || s.FailOnJudgeError
+
 	switch {
-	case s.Config != "" && len(s.Rules) > 0:
-		return nil, errors.New("semcheck: settings: give either config or rules, not both")
-	case len(s.Rules) > 0:
+	case s.File != "" && inline:
+		return nil, errors.New("semcheck: settings: give either config or the configuration itself, not both")
+	case inline:
 		for i := range s.Rules {
 			s.Rules[i].setDefaults()
 		}
 
-		return &Config{Rules: s.Rules}, nil
-	case s.Config != "":
-		return LoadConfig(s.Config)
+		return &s.Config, nil
+	case s.File != "":
+		return LoadConfig(s.File)
 	}
 
 	dir, err := os.Getwd()
