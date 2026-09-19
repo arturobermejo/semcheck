@@ -84,6 +84,7 @@ func TestDefaultJudge(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.env, func(t *testing.T) {
 			t.Setenv(JudgeEnv, tt.env)
+			t.Setenv(APIKeyEnv, "")
 
 			judge, err := DefaultJudge()
 			if tt.err {
@@ -104,6 +105,39 @@ func TestDefaultJudge(t *testing.T) {
 				t.Errorf("Decide = %v, %v; want %v for every question", decisions, err, tt.want)
 			}
 		})
+	}
+}
+
+func TestDefaultJudgeIsJev(t *testing.T) {
+	t.Setenv(JudgeEnv, "")
+	t.Setenv(APIKeyEnv, testKey)
+
+	judge, err := DefaultJudge()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if jev, ok := judge.(*JevJudge); !ok || jev.APIKey != testKey {
+		t.Errorf("judge = %#v, want a JevJudge with the key", judge)
+	}
+
+	// The variable for trying things out wins: no surprise requests.
+	t.Setenv(JudgeEnv, "fake:0.5")
+
+	if judge, _ = DefaultJudge(); judge == nil {
+		t.Fatal("no judge")
+	} else if _, ok := judge.(*FakeJudge); !ok {
+		t.Errorf("judge = %#v, want the fake one", judge)
+	}
+}
+
+func TestDefaultJudgeWithoutKey(t *testing.T) {
+	t.Setenv(JudgeEnv, "")
+	t.Setenv(APIKeyEnv, "")
+
+	_, err := DefaultJudge()
+	if err == nil || !strings.Contains(err.Error(), APIKeyEnv) || !strings.Contains(err.Error(), JudgeEnv) {
+		t.Errorf("error = %v, want one that names both variables", err)
 	}
 }
 

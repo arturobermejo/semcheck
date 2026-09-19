@@ -1,7 +1,7 @@
 # Configuration for ./custom-gcl, the golangci-lint build that includes
-# semcheck (see .custom-gcl.yml). Until there is a model, run it with
-# SEMCHECK_JUDGE=fake:0.95 in the environment. The stock golangci-lint does not know this
-# linter, which is why it is kept out of .golangci.yml.
+# semcheck (see .custom-gcl.yml). It needs TYPESAFE_API_KEY in the environment,
+# or SEMCHECK_JUDGE=fake:0.95 to run without a model. The stock golangci-lint
+# does not know this linter, which is why it is kept out of .golangci.yml.
 version: "2"
 
 linters:

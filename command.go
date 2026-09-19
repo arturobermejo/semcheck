@@ -17,9 +17,9 @@ import (
 // ConfigFile is the name of the file FindConfig looks for.
 const ConfigFile = ".semcheck.yml"
 
-// JudgeEnv selects the judge of DefaultJudge, for trying semcheck out without a
-// model: "fake:<probability>" gives that answer to every question, and "broken"
-// fails every time.
+// JudgeEnv replaces the judge of DefaultJudge, for trying semcheck out without
+// a model: "fake:<probability>" gives that answer to every question, and
+// "broken" fails every time.
 const JudgeEnv = "SEMCHECK_JUDGE"
 
 // Analyzer is the semcheck analysis for command-line drivers. Those parse the
@@ -102,7 +102,8 @@ func FindConfig(dir string) (string, error) {
 	}
 }
 
-// DefaultJudge returns the judge of the drivers.
+// DefaultJudge returns the judge of the drivers: Jev, with the key in
+// APIKeyEnv, unless JudgeEnv says otherwise.
 func DefaultJudge() (Judge, error) {
 	value := os.Getenv(JudgeEnv)
 
@@ -123,9 +124,13 @@ func DefaultJudge() (Judge, error) {
 		return nil, fmt.Errorf("semcheck: %s=%s: unknown judge", JudgeEnv, value)
 	}
 
+	if key := os.Getenv(APIKeyEnv); key != "" {
+		return &JevJudge{APIKey: key}, nil
+	}
+
 	// Not a judge that fails when asked: that would be a warning, and a run
 	// that cannot reach any model must not pass for a clean one.
-	return nil, fmt.Errorf("semcheck: there is no model yet: set %s=fake:0.95 to try semcheck out", JudgeEnv)
+	return nil, fmt.Errorf("semcheck: there is no API key: set %s, or %s=fake:0.95 to try semcheck out without a model", APIKeyEnv, JudgeEnv)
 }
 
 // unprefixed is an error of the package API on its way through a driver, which

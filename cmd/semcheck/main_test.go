@@ -224,12 +224,12 @@ func TestStandaloneConfigErrors(t *testing.T) {
 }
 
 func TestStandaloneWithoutModel(t *testing.T) {
-	env := append(os.Environ(), childEnv+"=1", semcheck.JudgeEnv+"=")
+	env := append(os.Environ(), childEnv+"=1", semcheck.JudgeEnv+"=", semcheck.APIKeyEnv+"=")
 
 	got := runWith(t, env, command(t), "-config=testdata/.semcheck.yml", "./testdata/hello")
 
-	if got.exitCode != 1 || !strings.Contains(got.stderr, semcheck.JudgeEnv) {
-		t.Errorf("got %+v, want exit code 1 and a hint about %s", got, semcheck.JudgeEnv)
+	if got.exitCode != 1 || !strings.Contains(got.stderr, semcheck.APIKeyEnv) {
+		t.Errorf("got %+v, want exit code 1 and a hint about %s", got, semcheck.APIKeyEnv)
 	}
 
 	// Even for a package with nothing to ask about: a run that could not have
