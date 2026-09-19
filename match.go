@@ -43,3 +43,12 @@ func (m *Matcher) matches(pass *analysis.Pass) []Match {
 
 	return found
 }
+
+// must is for matchers built from constants, like regexp.MustCompile.
+func must(m *Matcher, err error) *Matcher {
+	if err != nil {
+		panic(err)
+	}
+
+	return m
+}

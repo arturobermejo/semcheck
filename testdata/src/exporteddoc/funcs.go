@@ -26,3 +26,6 @@ var Literal = func() {}
 
 // main is not exported, whatever it does.
 func main() {}
+
+// NoBody is documented, but its body lives in assembly.
+func NoBody()

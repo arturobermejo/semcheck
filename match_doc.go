@@ -15,7 +15,8 @@ var exportedFuncDoc = &Matcher{
 	Types: []ast.Node{(*ast.FuncDecl)(nil)},
 	Match: func(_ *analysis.Pass, cur inspector.Cursor) (Match, bool) {
 		fn := cur.Node().(*ast.FuncDecl)
-		if !isExportedFunc(fn) || !hasDoc(fn) {
+		// Without a body there is no behavior to compare the comment with.
+		if fn.Body == nil || !isExportedFunc(fn) || !hasDoc(fn) {
 			return Match{}, false
 		}
 

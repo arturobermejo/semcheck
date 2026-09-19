@@ -69,6 +69,9 @@ func run(t *testing.T, name string, args ...string) result {
 var wantDiagnostics = []string{
 	"hello.go:5:6: exported-func-doc: matched",
 	"hello.go:10:16: exported-func-doc: matched",
+	"hello.go:12:16: func-prefix: matched",
+	"hello.go:15:16: exported-func-doc: matched",
+	"hello.go:15:16: func-prefix: matched",
 }
 
 func checkDiagnostics(t *testing.T, output string) {
