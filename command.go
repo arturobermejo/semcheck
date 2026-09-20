@@ -36,20 +36,7 @@ func newCommandAnalyzer() *analysis.Analyzer {
 	)
 
 	load := sync.OnceValues(func() (*analysis.Analyzer, error) {
-		path := configPath
-
-		if path == "" {
-			dir, err := os.Getwd()
-			if err != nil {
-				return nil, fmt.Errorf("semcheck: %w", err)
-			}
-
-			if path, err = FindConfig(dir); err != nil {
-				return nil, err
-			}
-		}
-
-		cfg, err := LoadConfig(path)
+		cfg, err := loadConfigOrNearest(configPath)
 		if err != nil {
 			return nil, err
 		}

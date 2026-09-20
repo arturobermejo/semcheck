@@ -1,10 +1,8 @@
 package semcheck
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
-	"os"
 
 	"github.com/golangci/plugin-module-register/register"
 	"go.yaml.in/yaml/v3"
@@ -65,40 +63,21 @@ func pluginConfig(settings any) (*Config, error) {
 		return nil, fmt.Errorf("semcheck: settings: %w", err)
 	}
 
-	dec := yaml.NewDecoder(bytes.NewReader(data))
-	dec.KnownFields(true)
-
 	var s pluginSettings
-	if err = dec.Decode(&s); err != nil {
+	if err = decodeStrict(data, &s); err != nil {
 		return nil, fmt.Errorf("semcheck: settings: %w", err)
 	}
 
-	inline := len(s.Rules) > 0 || s.FailOnJudgeError
-
-	switch {
+	switch inline := !s.isZero(); {
 	case s.File != "" && inline:
 		return nil, errors.New("semcheck: settings: give either config or the configuration itself, not both")
 	case inline:
-		for i := range s.Rules {
-			s.Rules[i].setDefaults()
-		}
+		s.setDefaults()
 
 		return &s.Config, nil
-	case s.File != "":
-		return LoadConfig(s.File)
 	}
 
-	dir, err := os.Getwd()
-	if err != nil {
-		return nil, fmt.Errorf("semcheck: %w", err)
-	}
-
-	path, err := FindConfig(dir)
-	if err != nil {
-		return nil, err
-	}
-
-	return LoadConfig(path)
+	return loadConfigOrNearest(s.File)
 }
 
 func (p plugin) BuildAnalyzers() ([]*analysis.Analyzer, error) {

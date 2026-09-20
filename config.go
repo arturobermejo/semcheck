@@ -28,6 +28,12 @@ type Config struct {
 	FailOnJudgeError bool `yaml:"fail_on_judge_error"`
 }
 
+// isZero reports whether nothing was configured. It has to know every field
+// of Config.
+func (c *Config) isZero() bool {
+	return len(c.Rules) == 0 && !c.FailOnJudgeError
+}
+
 // A Rule asks a closed question about the nodes a matcher selects.
 type Rule struct {
 	Name  string    `yaml:"name"`
@@ -98,35 +104,65 @@ func LoadConfig(path string) (*Config, error) {
 	return cfg, nil
 }
 
+// loadConfigOrNearest reads the file at path or, if there is no path, the
+// ConfigFile closest to the current directory.
+func loadConfigOrNearest(path string) (*Config, error) {
+	if path == "" {
+		dir, err := os.Getwd()
+		if err != nil {
+			return nil, fmt.Errorf("semcheck: %w", err)
+		}
+
+		if path, err = FindConfig(dir); err != nil {
+			return nil, err
+		}
+	}
+
+	return LoadConfig(path)
+}
+
 func parseConfig(data []byte) (*Config, error) {
+	var cfg Config
+	if err := decodeStrict(data, &cfg); err != nil {
+		return nil, err
+	}
+
+	cfg.setDefaults()
+
+	return &cfg, nil
+}
+
+// decodeStrict reads the one YAML document of data into v.
+func decodeStrict(data []byte, v any) error {
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 
 	// A misspelled field must be an error: an ignored min_confidnce would
 	// silently run the rule with the default.
 	dec.KnownFields(true)
 
-	var cfg Config
-	if err := dec.Decode(&cfg); err != nil {
+	if err := dec.Decode(v); err != nil {
 		if errors.Is(err, io.EOF) {
-			return nil, errors.New("the file is empty")
+			return errors.New("the file is empty")
 		}
 
-		return nil, err
+		return err
 	}
 
 	if err := dec.Decode(new(yaml.Node)); !errors.Is(err, io.EOF) {
-		return nil, errors.New("more than one YAML document")
+		return errors.New("more than one YAML document")
 	}
 
-	for i := range cfg.Rules {
-		cfg.Rules[i].setDefaults()
-	}
-
-	return &cfg, nil
+	return nil
 }
 
 // setDefaults runs after decoding, not in an UnmarshalYAML method: inside one,
 // the decoder forgets KnownFields and unknown fields go unnoticed.
+func (c *Config) setDefaults() {
+	for i := range c.Rules {
+		c.Rules[i].setDefaults()
+	}
+}
+
 func (r *Rule) setDefaults() {
 	if r.ReportIf == "" {
 		r.ReportIf = DefaultReportIf
