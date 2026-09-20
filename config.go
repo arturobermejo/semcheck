@@ -50,6 +50,17 @@ type Rule struct {
 	Tests bool `yaml:"tests"`
 }
 
+// message is what a finding of the rule says. The model gives a probability,
+// not a text: without a Message, the best description is the question and the
+// answer that was found.
+func (r Rule) message() string {
+	if r.Message != "" {
+		return r.Message
+	}
+
+	return fmt.Sprintf("the answer to %q is %s", r.Ask, r.ReportIf)
+}
+
 // A MatchSpec names a matcher and gives its arguments, as written in
 //
 //	match: { call: ["log.*", "slog.*"] }

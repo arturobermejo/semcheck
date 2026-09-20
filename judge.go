@@ -28,6 +28,15 @@ type Decision struct {
 	Cached bool
 }
 
+// confidence is how sure the judge is that the answer is a.
+func (d Decision) confidence(a Answer) float64 {
+	if a == AnswerNo {
+		return 1 - d.Yes
+	}
+
+	return d.Yes
+}
+
 // A Judge answers closed questions about code. The decision model behind
 // semcheck is one; so is the FakeJudge used in tests.
 //

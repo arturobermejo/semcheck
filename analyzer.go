@@ -76,13 +76,11 @@ func newAnalyzer(cfg *Config, judge Judge, opts options) (*analysis.Analyzer, er
 		return nil, errors.New("semcheck: there is no judge")
 	}
 
-	totals := &tally{}
-
-	matchers := make([]*Matcher, len(cfg.Rules))
+	c := &checker{cfg: cfg, judge: judge, opts: opts, totals: &tally{}, matchers: make([]*Matcher, len(cfg.Rules))}
 
 	for i, r := range cfg.Rules {
 		// Validate has built it already: it cannot fail.
-		matchers[i] = must(r.Match.matcher())
+		c.matchers[i] = must(r.Match.matcher())
 	}
 
 	return &analysis.Analyzer{
@@ -90,9 +88,18 @@ func newAnalyzer(cfg *Config, judge Judge, opts options) (*analysis.Analyzer, er
 		Doc:      "checks rules written in natural language on the code that AST matchers select",
 		Requires: []*analysis.Analyzer{inspect.Analyzer},
 		Run: func(pass *analysis.Pass) (any, error) {
-			return nil, check(pass, cfg, matchers, judge, opts, totals)
+			return nil, c.run(pass)
 		},
 	}, nil
+}
+
+// A checker has what the analysis of every package shares.
+type checker struct {
+	cfg      *Config
+	matchers []*Matcher // one for each rule of cfg
+	judge    Judge
+	opts     options
+	totals   *tally
 }
 
 // An inquiry is a question along with where it comes from.
@@ -101,7 +108,54 @@ type inquiry struct {
 	pos  token.Pos
 }
 
-func check(pass *analysis.Pass, cfg *Config, matchers []*Matcher, judge Judge, opts options, totals *tally) error {
+type finding struct {
+	inquiry
+	confidence float64
+}
+
+func (c *checker) run(pass *analysis.Pass) error {
+	inquiries, questions, err := c.inquire(pass)
+	if err != nil {
+		return err
+	}
+
+	if c.opts.dryRun {
+		if estimate := c.totals.estimate(questions); estimate != "" {
+			c.opts.report("dry run: " + pass.Pkg.Path() + ": " + estimate)
+		}
+
+		return nil
+	}
+
+	// One batch for the whole package: round trips are what a model costs.
+	ctx, cancel := context.WithTimeout(context.Background(), judgeTimeout)
+	defer cancel()
+
+	decisions, err := consult(ctx, c.judge, questions)
+	if err != nil {
+		return c.unanswered(pass.Pkg.Path(), len(questions), len(questions), err)
+	}
+
+	if c.opts.stats && len(questions) > 0 {
+		c.opts.report("stats: " + pass.Pkg.Path() + ": " + c.totals.record(decisions))
+	}
+
+	findings, failed, cause := findingsOf(inquiries, decisions)
+
+	if failed > 0 {
+		if err := c.unanswered(pass.Pkg.Path(), failed, len(questions), cause); err != nil {
+			return err
+		}
+	}
+
+	report(pass, findings)
+
+	return nil
+}
+
+// inquire returns what the rules ask about the package: the inquiries and
+// their questions, one for one.
+func (c *checker) inquire(pass *analysis.Pass) ([]inquiry, []Question, error) {
 	var (
 		inquiries []inquiry
 		questions []Question
@@ -109,13 +163,13 @@ func check(pass *analysis.Pass, cfg *Config, matchers []*Matcher, judge Judge, o
 	)
 
 	var silenced nolint
-	if opts.honorNolint {
+	if c.opts.honorNolint {
 		silenced = newNolint(pass)
 	}
 
-	for i, r := range cfg.Rules {
-		for _, match := range matchers[i].matches(pass) {
-			if inTestFile(pass, match.Node) && !r.Tests && !matchers[i].ForTests {
+	for i, r := range c.cfg.Rules {
+		for _, match := range c.matchers[i].matches(pass) {
+			if inTestFile(pass, match.Node) && !r.Tests && !c.matchers[i].ForTests {
 				continue
 			}
 
@@ -132,7 +186,7 @@ func check(pass *analysis.Pass, cfg *Config, matchers []*Matcher, judge Judge, o
 			}
 
 			if err != nil {
-				return err
+				return nil, nil, err
 			}
 
 			inquiries = append(inquiries, inquiry{r, match.Pos})
@@ -141,41 +195,19 @@ func check(pass *analysis.Pass, cfg *Config, matchers []*Matcher, judge Judge, o
 	}
 
 	if n := len(tooLarge); n > 0 {
-		opts.warn(fmt.Sprintf("%s: %d fragments too large to ask about, the first at %s", pass.Pkg.Path(), n, pass.Fset.Position(tooLarge[0])))
+		c.opts.warn(fmt.Sprintf("%s: %d fragments too large to ask about, the first at %s", pass.Pkg.Path(), n, pass.Fset.Position(tooLarge[0])))
 	}
 
-	if opts.dryRun {
-		if estimate := totals.estimate(questions); estimate != "" {
-			opts.report("dry run: " + pass.Pkg.Path() + ": " + estimate)
-		}
+	return inquiries, questions, nil
+}
 
-		return nil
-	}
-
-	// One batch for the whole package: round trips are what a model costs.
-	ctx, cancel := context.WithTimeout(context.Background(), judgeTimeout)
-	defer cancel()
-
-	decisions, err := consult(ctx, judge, questions)
-	if err != nil {
-		return unanswered(pass, cfg, opts, len(questions), len(questions), err)
-	}
-
-	type finding struct {
-		inquiry
-		confidence float64
-	}
-
-	var (
-		findings []finding
-		failed   int
-		firstErr error
-	)
-
+// findingsOf returns the decisions that make a finding, how many questions
+// have no decision, and why the first of those has none.
+func findingsOf(inquiries []inquiry, decisions []Decision) (findings []finding, failed int, cause error) {
 	for i, d := range decisions {
 		if d.Err != nil {
 			failed++
-			firstErr = cmp.Or(firstErr, d.Err)
+			cause = cmp.Or(cause, d.Err)
 
 			continue
 		}
@@ -185,16 +217,10 @@ func check(pass *analysis.Pass, cfg *Config, matchers []*Matcher, judge Judge, o
 		}
 	}
 
-	if opts.stats && len(questions) > 0 {
-		opts.report("stats: " + pass.Pkg.Path() + ": " + totals.record(decisions))
-	}
+	return findings, failed, cause
+}
 
-	if failed > 0 {
-		if err := unanswered(pass, cfg, opts, failed, len(questions), firstErr); err != nil {
-			return err
-		}
-	}
-
+func report(pass *analysis.Pass, findings []finding) {
 	// Drivers print diagnostics in the order they are reported. By file name
 	// first: drivers parse files in parallel, and which one gets the lower
 	// positions changes from run to run.
@@ -215,44 +241,22 @@ func check(pass *analysis.Pass, cfg *Config, matchers []*Matcher, judge Judge, o
 			Message:  fmt.Sprintf("%s: %s (%.2f)", f.rule.Name, f.rule.message(), f.confidence),
 		})
 	}
-
-	return nil
 }
 
 // unanswered decides what becomes of the questions the judge left without an
 // answer: an error if the configuration says so, a warning otherwise. A model
 // that is down or slow must not, by itself, turn every build red.
-func unanswered(pass *analysis.Pass, cfg *Config, opts options, failed, total int, cause error) error {
+func (c *checker) unanswered(pkg string, failed, total int, cause error) error {
 	summary := fmt.Sprintf("%d of %d questions were not answered", failed, total)
 	if total == 1 {
 		summary = "the only question was not answered"
 	}
 
-	if cfg.FailOnJudgeError {
+	if c.cfg.FailOnJudgeError {
 		return fmt.Errorf("%s: %w", summary, cause)
 	}
 
-	opts.warn(fmt.Sprintf("%s: %s: %v%s", pass.Pkg.Path(), summary, cause, opts.staleHint))
+	c.opts.warn(fmt.Sprintf("%s: %s: %v%s", pkg, summary, cause, c.opts.staleHint))
 
 	return nil
-}
-
-// confidence is how sure the judge is that the answer is a.
-func (d Decision) confidence(a Answer) float64 {
-	if a == AnswerNo {
-		return 1 - d.Yes
-	}
-
-	return d.Yes
-}
-
-// message is what a finding of the rule says. The model gives a probability,
-// not a text: without a Message, the best description is the question and the
-// answer that was found.
-func (r Rule) message() string {
-	if r.Message != "" {
-		return r.Message
-	}
-
-	return fmt.Sprintf("the answer to %q is %s", r.Ask, r.ReportIf)
 }
