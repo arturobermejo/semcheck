@@ -4,7 +4,11 @@ linters:
   default: none
   enable:
     - govet
+    - ineffassign
+    - nolintlint
     - staticcheck
+    - unparam
+    - unused
     - wsl_v5
   settings:
     govet:

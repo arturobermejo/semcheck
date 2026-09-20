@@ -8,7 +8,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-// nolint knows the lines of a package where //nolint directives silence
+// A nolint knows the lines of a package where //nolint directives silence
 // semcheck. Only golangci-lint understands those directives: without this the
 // standalone command would ignore them. Looking before asking also keeps
 // silenced code from becoming questions.
