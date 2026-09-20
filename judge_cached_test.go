@@ -9,15 +9,15 @@ import (
 	"testing"
 )
 
-// memoryCache is a decisionCache for tests.
-type memoryCache struct {
+// fakeCache is a decisionCache for tests, which can fail to keep.
+type fakeCache struct {
 	mu      sync.Mutex
 	yes     map[cacheKey]float64
 	putErr  error
 	putKeys int
 }
 
-func (m *memoryCache) get(key cacheKey) (float64, bool) {
+func (m *fakeCache) get(key cacheKey) (float64, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -26,7 +26,7 @@ func (m *memoryCache) get(key cacheKey) (float64, bool) {
 	return yes, ok
 }
 
-func (m *memoryCache) put(key cacheKey, yes float64) error {
+func (m *fakeCache) put(key cacheKey, yes float64) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -79,7 +79,7 @@ func answersOf(decisions []Decision) []float64 {
 
 func TestCachedJudge(t *testing.T) {
 	fake := &FakeJudge{Answer: byFragment}
-	judge := newCachedJudge(identifiedFake{fake, "fake 1"}, &memoryCache{})
+	judge := newCachedJudge(identifiedFake{fake, "fake 1"}, &fakeCache{})
 
 	decisions, err := judge.Decide(context.Background(), questions("a", "b", "c"))
 	if err != nil || !slices.Equal(answersOf(decisions), []float64{0.1, 0.2, 0.3}) {
@@ -110,7 +110,7 @@ func TestCachedJudge(t *testing.T) {
 func TestCachedJudgeIsReproducible(t *testing.T) {
 	calls := 0.0
 	fake := &FakeJudge{Answer: func(Question) float64 { calls++; return 0.9 + calls/100 }}
-	judge := newCachedJudge(identifiedFake{fake, "fake 1"}, &memoryCache{})
+	judge := newCachedJudge(identifiedFake{fake, "fake 1"}, &fakeCache{})
 
 	for range 3 {
 		decisions, err := judge.Decide(context.Background(), questions("a"))
@@ -121,7 +121,7 @@ func TestCachedJudgeIsReproducible(t *testing.T) {
 }
 
 func TestCachedJudgeKeysOnTheIdentity(t *testing.T) {
-	cache := &memoryCache{}
+	cache := &fakeCache{}
 	old := &FakeJudge{Answer: func(Question) float64 { return 0.2 }}
 	latest := &FakeJudge{Answer: func(Question) float64 { return 0.8 }}
 
@@ -141,7 +141,7 @@ func TestCachedJudgeKeysOnTheIdentity(t *testing.T) {
 }
 
 func TestCachedJudgeWhenTheJudgeFails(t *testing.T) {
-	cache := &memoryCache{}
+	cache := &fakeCache{}
 	fake := &FakeJudge{Answer: byFragment}
 	judge := newCachedJudge(identifiedFake{fake, "fake 1"}, cache)
 
@@ -189,7 +189,7 @@ func (p partialJudge) Decide(ctx context.Context, questions []Question) ([]Decis
 }
 
 func TestCachedJudgeKeepsOnlyAnswers(t *testing.T) {
-	cache := &memoryCache{}
+	cache := &fakeCache{}
 	fake := &FakeJudge{Answer: byFragment}
 	judge := newCachedJudge(partialJudge{identifiedFake{fake, "fake 1"}}, cache)
 
@@ -204,7 +204,7 @@ func TestCachedJudgeKeepsOnlyAnswers(t *testing.T) {
 }
 
 func TestCachedJudgeDoesNotKeepNonsense(t *testing.T) {
-	cache := &memoryCache{}
+	cache := &fakeCache{}
 	fake := &FakeJudge{Answer: func(Question) float64 { return 1.5 }}
 	judge := newCachedJudge(identifiedFake{fake, "fake 1"}, cache)
 
@@ -219,7 +219,7 @@ func TestCachedJudgeDoesNotKeepNonsense(t *testing.T) {
 }
 
 func TestCachedJudgeWarnsOnceWhenItCannotKeep(t *testing.T) {
-	cache := &memoryCache{putErr: errors.New("disk full")}
+	cache := &fakeCache{putErr: errors.New("disk full")}
 	judge := newCachedJudge(identifiedFake{&FakeJudge{Answer: byFragment}, "fake 1"}, cache)
 
 	var warnings []string
@@ -235,6 +235,146 @@ func TestCachedJudgeWarnsOnceWhenItCannotKeep(t *testing.T) {
 
 	if len(warnings) != 1 || !strings.Contains(warnings[0], "disk full") {
 		t.Errorf("warnings = %q, want one about the disk", warnings)
+	}
+}
+
+// blockingJudge answers with the number of the question, 0.01 for the first
+// one it ever got, and only once it is released.
+type blockingJudge struct {
+	entered chan struct{} // gets a value for every call to Decide
+	release chan struct{} // closed to let every call go on
+	err     error
+
+	mu    sync.Mutex
+	asked []string
+}
+
+func newBlockingJudge() *blockingJudge {
+	return &blockingJudge{entered: make(chan struct{}, 10), release: make(chan struct{})}
+}
+
+func (b *blockingJudge) identity() string { return "blocking 1" }
+
+func (b *blockingJudge) Decide(_ context.Context, questions []Question) ([]Decision, error) {
+	b.mu.Lock()
+
+	decisions := make([]Decision, len(questions))
+
+	for i, q := range questions {
+		b.asked = append(b.asked, q.Fragment)
+		decisions[i].Yes = float64(len(b.asked)) / 100
+	}
+
+	b.mu.Unlock()
+
+	b.entered <- struct{}{}
+
+	<-b.release
+
+	return decisions, b.err
+}
+
+// Drivers analyze a package and its variant with the tests at once: the same
+// questions, from two calls.
+func TestCachedJudgeAsksOnceForCallsAtTheSameTime(t *testing.T) {
+	inner := newBlockingJudge()
+	judge := newCachedJudge(inner, &fakeCache{})
+
+	var (
+		wg            sync.WaitGroup
+		first, second []Decision
+	)
+
+	wg.Go(func() { first, _ = judge.Decide(context.Background(), questions("a", "b")) })
+
+	<-inner.entered // the first call is waiting for its answers
+
+	wg.Go(func() { second, _ = judge.Decide(context.Background(), questions("b", "z", "a")) })
+
+	<-inner.entered // the second one has seen that only z is left to ask
+
+	close(inner.release)
+	wg.Wait()
+
+	if got := strings.Join(inner.asked, ""); got != "abz" {
+		t.Errorf("the judge was asked %q, want every question once: abz", got)
+	}
+
+	if !slices.Equal(answersOf(first), []float64{0.01, 0.02}) || !slices.Equal(answersOf(second), []float64{0.02, 0.03, 0.01}) {
+		t.Errorf("decisions = %v and %v, want the same ones for a and b", answersOf(first), answersOf(second))
+	}
+}
+
+func TestCachedJudgeSharesAFailure(t *testing.T) {
+	inner := newBlockingJudge()
+	inner.err = errors.New("no network")
+
+	cache := &fakeCache{}
+	judge := newCachedJudge(inner, cache)
+
+	var (
+		wg            sync.WaitGroup
+		first, second []Decision
+	)
+
+	wg.Go(func() { first, _ = judge.Decide(context.Background(), questions("a")) })
+
+	<-inner.entered
+
+	wg.Go(func() { second, _ = judge.Decide(context.Background(), questions("z", "a")) })
+
+	<-inner.entered
+
+	close(inner.release)
+	wg.Wait()
+
+	for _, d := range slices.Concat(first, second) {
+		if !errors.Is(d.Err, inner.err) {
+			t.Errorf("decision = %+v, want the failure of the judge", d)
+		}
+	}
+
+	// Nobody is left waiting for it: the next call asks again.
+	inner.err = nil
+
+	if decisions, _ := judge.Decide(context.Background(), questions("a")); decisions[0].Err != nil {
+		t.Errorf("decision = %+v, want an answer", decisions[0])
+	}
+}
+
+func TestCachedJudgeStopsWaitingWhenCanceled(t *testing.T) {
+	inner := newBlockingJudge()
+	judge := newCachedJudge(inner, &fakeCache{})
+
+	var wg sync.WaitGroup
+
+	wg.Go(func() { _, _ = judge.Decide(context.Background(), questions("a")) })
+
+	<-inner.entered
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	decisions, err := judge.Decide(ctx, questions("a"))
+	if err != nil || !errors.Is(decisions[0].Err, context.Canceled) {
+		t.Errorf("Decide = %+v, %v; want a decision that was canceled", decisions, err)
+	}
+
+	close(inner.release)
+	wg.Wait()
+}
+
+func TestCachedJudgeAsksOnceForTheSameQuestionInABatch(t *testing.T) {
+	fake := &FakeJudge{Answer: byFragment}
+	judge := newCachedJudge(identifiedFake{fake, "fake 1"}, &fakeCache{})
+
+	decisions, err := judge.Decide(context.Background(), questions("a", "b", "a"))
+	if err != nil || !slices.Equal(answersOf(decisions), []float64{0.1, 0.2, 0.1}) {
+		t.Fatalf("Decide = %+v, %v", decisions, err)
+	}
+
+	if got := asked(fake); got != "ab" {
+		t.Errorf("the judge was asked %q, want ab", got)
 	}
 }
 

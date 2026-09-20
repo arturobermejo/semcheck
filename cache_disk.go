@@ -13,7 +13,7 @@ import (
 )
 
 // CacheEnv names the directory where decisions are kept, instead of one in the
-// cache directory of the user. "off" keeps none.
+// cache directory of the user. "off" keeps them for the run only.
 const CacheEnv = "SEMCHECK_CACHE"
 
 const (

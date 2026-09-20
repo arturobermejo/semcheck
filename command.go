@@ -135,11 +135,12 @@ func DefaultJudge() (Judge, error) {
 }
 
 // withCache returns judge behind the cache of decisions of CacheEnv. A cache
-// that cannot be used is worth a warning, not a failure: the judge still works.
+// on disk that cannot be used is worth a warning, not a failure: the judge
+// still works, with a cache that lasts for the run.
 func withCache(judge cacheableJudge) Judge {
 	dir, err := cacheDir()
 	if err == nil && dir == "" {
-		return judge
+		return newCachedJudge(judge, &memoryCache{})
 	}
 
 	var cache *diskCache
@@ -148,9 +149,9 @@ func withCache(judge cacheableJudge) Judge {
 	}
 
 	if err != nil {
-		warn("running without a cache of decisions: " + strings.TrimPrefix(err.Error(), "semcheck: "))
+		warn("decisions will not be kept for the next run: " + strings.TrimPrefix(err.Error(), "semcheck: "))
 
-		return judge
+		return newCachedJudge(judge, &memoryCache{})
 	}
 
 	return newCachedJudge(judge, cache)

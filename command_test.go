@@ -120,11 +120,20 @@ func TestDefaultJudgeIsJev(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if jev, ok := judge.(*JevJudge); !ok || jev.APIKey != testKey {
-		t.Errorf("judge = %#v, want a JevJudge with the key", judge)
+	cached, ok := judge.(*cachedJudge)
+	if !ok {
+		t.Fatalf("judge = %#v, want a cachedJudge", judge)
 	}
 
-	// Without a cache because it was asked for: nothing to warn about.
+	if jev, ok := cached.judge.(*JevJudge); !ok || jev.APIKey != testKey {
+		t.Errorf("it asks %#v, want a JevJudge with the key", cached.judge)
+	}
+
+	if _, ok := cached.cache.(*memoryCache); !ok {
+		t.Errorf("it keeps decisions in %#v, want a memoryCache", cached.cache)
+	}
+
+	// Nothing on disk because it was asked for: nothing to warn about.
 	if got := warnings(); got != "" {
 		t.Errorf("stderr = %q, want nothing", got)
 	}
@@ -183,11 +192,13 @@ func TestDefaultJudgeWithoutAUsableCache(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, ok := judge.(*JevJudge); !ok {
-		t.Errorf("judge = %#v, want the JevJudge itself", judge)
+	if cached, ok := judge.(*cachedJudge); !ok || cached.cache == nil {
+		t.Errorf("judge = %#v, want a cachedJudge", judge)
+	} else if _, ok := cached.cache.(*memoryCache); !ok {
+		t.Errorf("it keeps decisions in %#v, want a memoryCache", cached.cache)
 	}
 
-	if got := warnings(); !strings.HasPrefix(got, "semcheck: warning: running without a cache of decisions: cache: ") {
+	if got := warnings(); !strings.HasPrefix(got, "semcheck: warning: decisions will not be kept for the next run: cache: ") {
 		t.Errorf("stderr = %q, want a warning", got)
 	}
 }

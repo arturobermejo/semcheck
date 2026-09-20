@@ -315,3 +315,23 @@ func TestCacheDir(t *testing.T) {
 		t.Errorf("no home: cacheDir = %q, %v; want an error that names %s", dir, err, CacheEnv)
 	}
 }
+
+func TestMemoryCache(t *testing.T) {
+	var c memoryCache
+
+	if yes, ok := c.get(keyOf("a")); ok {
+		t.Errorf("get = %v from an empty cache", yes)
+	}
+
+	if err := c.put(keyOf("a"), 0.97); err != nil {
+		t.Fatal(err)
+	}
+
+	if yes, ok := c.get(keyOf("a")); !ok || yes != 0.97 {
+		t.Errorf("get = %v, %v; want 0.97", yes, ok)
+	}
+
+	if yes, ok := c.get(keyOf("b")); ok {
+		t.Errorf("get = %v for a key that was not put", yes)
+	}
+}
