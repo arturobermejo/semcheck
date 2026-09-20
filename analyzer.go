@@ -186,7 +186,7 @@ func check(pass *analysis.Pass, cfg *Config, matchers []*Matcher, judge Judge, o
 	}
 
 	if opts.stats && len(questions) > 0 {
-		opts.report("stats: " + pass.Pkg.Path() + ": " + totals.count(decisions))
+		opts.report("stats: " + pass.Pkg.Path() + ": " + totals.record(decisions))
 	}
 
 	if failed > 0 {

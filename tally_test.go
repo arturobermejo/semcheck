@@ -44,17 +44,17 @@ func TestDollars(t *testing.T) {
 	}
 }
 
-func TestTallyCount(t *testing.T) {
+func TestTallyRecord(t *testing.T) {
 	var totals tally
 
-	got := totals.count([]Decision{{Yes: 0.9}, {Yes: 0.1, Cached: true}, {Cached: true, Err: errFragmentTooLarge}})
+	got := totals.record([]Decision{{Yes: 0.9}, {Yes: 0.1, Cached: true}, {Cached: true, Err: errFragmentTooLarge}})
 	if want := "3 questions, 1 from the cache; so far 3 questions, 1 from the cache"; got != want {
-		t.Errorf("count = %q\nwant    %q", got, want)
+		t.Errorf("record = %q\nwant     %q", got, want)
 	}
 
-	got = totals.count([]Decision{{Yes: 0.9, Cached: true}})
+	got = totals.record([]Decision{{Yes: 0.9, Cached: true}})
 	if want := "1 question, 1 from the cache; so far 4 questions, 2 from the cache"; got != want {
-		t.Errorf("count = %q\nwant    %q", got, want)
+		t.Errorf("record = %q\nwant     %q", got, want)
 	}
 }
 

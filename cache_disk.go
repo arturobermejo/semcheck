@@ -82,6 +82,8 @@ func (d *diskCache) path(key cacheKey) string {
 }
 
 // get takes anything it cannot make sense of for a decision it does not have.
+//
+//nolint:semcheck // it renews the date of the file it reads, as a cache does
 func (d *diskCache) get(key cacheKey) (float64, bool) {
 	path := d.path(key)
 

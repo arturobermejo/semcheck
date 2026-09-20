@@ -71,8 +71,9 @@ func (t *tally) estimate(questions []Question) string {
 		plural(t.questions, "question"), t.tokens, dollars(t.tokens))
 }
 
-// count describes where the decisions of a package came from.
-func (t *tally) count(decisions []Decision) string {
+// record adds the decisions of a package to the totals, and describes where
+// they came from.
+func (t *tally) record(decisions []Decision) string {
 	cached := 0
 
 	for _, d := range decisions {
