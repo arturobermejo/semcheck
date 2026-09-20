@@ -29,7 +29,11 @@ const JudgeEnv = "SEMCHECK_JUDGE"
 var Analyzer = newCommandAnalyzer()
 
 func newCommandAnalyzer() *analysis.Analyzer {
-	var configPath string
+	var (
+		configPath string
+		dryRun     bool
+		stats      bool
+	)
 
 	load := sync.OnceValues(func() (*analysis.Analyzer, error) {
 		path := configPath
@@ -50,12 +54,19 @@ func newCommandAnalyzer() *analysis.Analyzer {
 			return nil, err
 		}
 
+		opts := options{honorNolint: true, dryRun: dryRun, stats: stats}
+
+		// A dry run asks nobody: it needs no judge, and so no API key.
+		if dryRun {
+			return newAnalyzer(cfg, nil, opts)
+		}
+
 		judge, err := DefaultJudge()
 		if err != nil {
 			return nil, err
 		}
 
-		return NewAnalyzer(cfg, judge)
+		return newAnalyzer(cfg, judge, opts)
 	})
 
 	a := &analysis.Analyzer{
@@ -72,6 +83,8 @@ func newCommandAnalyzer() *analysis.Analyzer {
 		},
 	}
 
+	a.Flags.BoolVar(&dryRun, "dry-run", false, "count the questions, and estimate their cost, instead of asking them")
+	a.Flags.BoolVar(&stats, "stats", false, "tell how many decisions of every package came from the cache")
 	a.Flags.StringVar(&configPath, "config", "", "rules `file` (default: "+ConfigFile+" in the current directory or the closest parent that has one)")
 
 	return a

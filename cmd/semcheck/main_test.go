@@ -285,3 +285,43 @@ func TestStandaloneJudgeFails(t *testing.T) {
 		t.Errorf("with fail_on_judge_error: got %+v, want exit code 1 and an error, not a warning", got)
 	}
 }
+
+// A dry run needs neither a model nor a key, finds nothing, and counts the
+// code that hello shares with its test variant once.
+func TestStandaloneDryRun(t *testing.T) {
+	env := append(os.Environ(), childEnv+"=1", semcheck.JudgeEnv+"=", semcheck.APIKeyEnv+"=")
+
+	got := runWith(t, env, command(t), "-dry-run", "-config=testdata/.semcheck.yml", "./testdata/hello", "./testdata/clean")
+
+	if got.exitCode != 0 || got.stdout != "" {
+		t.Errorf("got %+v, want exit code 0 and nothing on stdout", got)
+	}
+
+	lines := strings.Split(strings.TrimSpace(got.stderr), "\n")
+	slices.Sort(lines)
+
+	const hello = "semcheck: dry run: github.com/arturobermejo/semcheck/cmd/semcheck/testdata/hello: "
+
+	if len(lines) != 2 ||
+		!strings.HasPrefix(lines[0], hello+"1 question (test-name-matches 1), ") ||
+		!strings.HasPrefix(lines[1], hello+"6 questions (doc-matches-code 3, name-matches-behavior 2, no-pii-in-logs 1), ") {
+		t.Errorf("stderr:\n%s", got.stderr)
+	}
+
+	if !strings.Contains(got.stderr, "so far 7 questions, ") {
+		t.Errorf("stderr does not have the total of 7 questions:\n%s", got.stderr)
+	}
+}
+
+func TestStandaloneStats(t *testing.T) {
+	got := run(t, command(t), "-stats", "-config=testdata/.semcheck.yml", "./testdata/hello")
+
+	// The findings are still there: stats only add lines.
+	if got.exitCode != 3 || !strings.Contains(got.stderr, "no-pii-in-logs: ") {
+		t.Errorf("got %+v, want exit code 3 and the findings", got)
+	}
+
+	if !strings.Contains(got.stderr, "semcheck: stats: ") || !strings.Contains(got.stderr, ", 0 from the cache") {
+		t.Errorf("stderr does not have the stats:\n%s", got.stderr)
+	}
+}

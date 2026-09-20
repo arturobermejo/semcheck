@@ -303,6 +303,11 @@ func TestCachedJudgeAsksOnceForCallsAtTheSameTime(t *testing.T) {
 	if !slices.Equal(answersOf(first), []float64{0.01, 0.02}) || !slices.Equal(answersOf(second), []float64{0.02, 0.03, 0.01}) {
 		t.Errorf("decisions = %v and %v, want the same ones for a and b", answersOf(first), answersOf(second))
 	}
+
+	// Of the second call, only z was asked.
+	if !second[0].Cached || second[1].Cached || !second[2].Cached {
+		t.Errorf("decisions = %+v, want b and a marked as not asked by this call", second)
+	}
 }
 
 func TestCachedJudgeSharesAFailure(t *testing.T) {

@@ -46,6 +46,17 @@ type options struct {
 	// staleHint is added to the warning about unanswered questions by drivers
 	// that cache results: they will keep serving the empty one.
 	staleHint string
+
+	// dryRun counts the questions instead of asking them: no judge is needed,
+	// and nothing is found.
+	dryRun bool
+
+	// stats tells, for every package, how many decisions came from the cache.
+	stats bool
+
+	// report, if set, receives what dryRun and stats have to say instead of
+	// the standard error.
+	report func(string)
 }
 
 func newAnalyzer(cfg *Config, judge Judge, opts options) (*analysis.Analyzer, error) {
@@ -56,6 +67,16 @@ func newAnalyzer(cfg *Config, judge Judge, opts options) (*analysis.Analyzer, er
 	if opts.warn == nil {
 		opts.warn = warn
 	}
+
+	if opts.report == nil {
+		opts.report = func(msg string) { fmt.Fprintln(stderr, "semcheck: "+msg) }
+	}
+
+	if judge == nil && !opts.dryRun {
+		return nil, errors.New("semcheck: there is no judge")
+	}
+
+	totals := &tally{}
 
 	matchers := make([]*Matcher, len(cfg.Rules))
 
@@ -69,7 +90,7 @@ func newAnalyzer(cfg *Config, judge Judge, opts options) (*analysis.Analyzer, er
 		Doc:      "checks rules written in natural language on the code that AST matchers select",
 		Requires: []*analysis.Analyzer{inspect.Analyzer},
 		Run: func(pass *analysis.Pass) (any, error) {
-			return nil, check(pass, cfg, matchers, judge, opts)
+			return nil, check(pass, cfg, matchers, judge, opts, totals)
 		},
 	}, nil
 }
@@ -80,7 +101,7 @@ type inquiry struct {
 	pos  token.Pos
 }
 
-func check(pass *analysis.Pass, cfg *Config, matchers []*Matcher, judge Judge, opts options) error {
+func check(pass *analysis.Pass, cfg *Config, matchers []*Matcher, judge Judge, opts options, totals *tally) error {
 	var (
 		inquiries []inquiry
 		questions []Question
@@ -123,6 +144,14 @@ func check(pass *analysis.Pass, cfg *Config, matchers []*Matcher, judge Judge, o
 		opts.warn(fmt.Sprintf("%s: %d fragments too large to ask about, the first at %s", pass.Pkg.Path(), n, pass.Fset.Position(tooLarge[0])))
 	}
 
+	if opts.dryRun {
+		if estimate := totals.estimate(questions); estimate != "" {
+			opts.report("dry run: " + pass.Pkg.Path() + ": " + estimate)
+		}
+
+		return nil
+	}
+
 	// One batch for the whole package: round trips are what a model costs.
 	ctx, cancel := context.WithTimeout(context.Background(), judgeTimeout)
 	defer cancel()
@@ -154,6 +183,10 @@ func check(pass *analysis.Pass, cfg *Config, matchers []*Matcher, judge Judge, o
 		if c := d.confidence(inquiries[i].rule.ReportIf); c >= inquiries[i].rule.MinConfidence {
 			findings = append(findings, finding{inquiries[i], c})
 		}
+	}
+
+	if opts.stats && len(questions) > 0 {
+		opts.report("stats: " + pass.Pkg.Path() + ": " + totals.count(decisions))
 	}
 
 	if failed > 0 {

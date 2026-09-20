@@ -22,6 +22,10 @@ type Decision struct {
 	// Err, if set, says why this one question has no answer, when the judge
 	// could answer the others of the batch. Yes is then meaningless.
 	Err error
+
+	// Cached says that nobody was asked: the decision was made in an earlier
+	// run.
+	Cached bool
 }
 
 // A Judge answers closed questions about code. The decision model behind

@@ -64,7 +64,7 @@ func (c *cachedJudge) Decide(ctx context.Context, questions []Question) ([]Decis
 		keys[i] = cacheKeyOf(identity, q)
 
 		if yes, ok := c.cache.get(keys[i]); ok {
-			decisions[i] = Decision{Yes: yes}
+			decisions[i] = Decision{Yes: yes, Cached: true}
 
 			continue
 		}
@@ -104,7 +104,9 @@ func (c *cachedJudge) Decide(ctx context.Context, questions []Question) ([]Decis
 	for i, p := range theirs {
 		select {
 		case <-p.done:
+			// Not asked here: as good as cached for whoever counts questions.
 			decisions[i] = p.decision
+			decisions[i].Cached = p.decision.Err == nil
 		case <-ctx.Done():
 			decisions[i].Err = context.Cause(ctx)
 		}
