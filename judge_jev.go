@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/arturobermejo/semcheck/internal/jev"
 )
@@ -43,9 +44,16 @@ type JevJudge struct {
 
 	once  sync.Once
 	slots chan struct{}
+
+	billed atomic.Int64
 }
 
-var _ Judge = (*JevJudge)(nil)
+var (
+	_ Judge        = (*JevJudge)(nil)
+	_ meteredJudge = (*JevJudge)(nil)
+)
+
+func (j *JevJudge) billedTokens() (int64, bool) { return j.billed.Load(), true }
 
 // jevPrompt changes when what Jev gets to read for a question does: the names
 // or the contents of jevState, or how the questions are put. The answers given
@@ -118,9 +126,12 @@ func (j *JevJudge) Decide(ctx context.Context, questions []Question) ([]Decision
 		wg.Go(func() {
 			defer j.release()
 
-			if err := r.send(ctx, client, questions, decisions, answered); err != nil {
+			tokens, err := r.send(ctx, client, questions, decisions, answered)
+			if err != nil {
 				cancel(err)
 			}
+
+			j.billed.Add(int64(tokens))
 		})
 	}
 
@@ -138,8 +149,8 @@ func (j *JevJudge) Decide(ctx context.Context, questions []Question) ([]Decision
 }
 
 // send writes the answers of r in its places of decisions and answered, which
-// no other request touches.
-func (r *jevRequest) send(ctx context.Context, client *jev.Client, questions []Question, decisions []Decision, answered []bool) error {
+// no other request touches. It returns the input tokens the request cost.
+func (r *jevRequest) send(ctx context.Context, client *jev.Client, questions []Question, decisions []Decision, answered []bool) (int, error) {
 	asks := make(map[string]jev.Question, len(r.indexes))
 	for n, i := range r.indexes {
 		asks[fmt.Sprintf("q%d", n+1)] = jev.Noul(questions[i].Ask)
@@ -147,19 +158,19 @@ func (r *jevRequest) send(ctx context.Context, client *jev.Client, questions []Q
 
 	response, err := client.Ask(ctx, r.state, asks)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	for n, i := range r.indexes {
 		yes, err := response.Noul(fmt.Sprintf("q%d", n+1))
 		if err != nil {
-			return err
+			return response.Usage.InputTokens, err
 		}
 
 		decisions[i].Yes, answered[i] = yes, true
 	}
 
-	return nil
+	return response.Usage.InputTokens, nil
 }
 
 // acquire waits for a free slot. It reports false if ctx ends first.

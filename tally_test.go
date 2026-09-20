@@ -1,6 +1,7 @@
 package semcheck
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -49,14 +50,27 @@ func TestDollars(t *testing.T) {
 func TestTallyRecord(t *testing.T) {
 	var totals tally
 
-	got := totals.record([]Decision{{Yes: 0.9}, {Yes: 0.1, Cached: true}, {Cached: true, Err: errFragmentTooLarge}})
+	asked := questions("a", "b", "c")
+
+	got := totals.record(asked, []Decision{{Yes: 0.9}, {Yes: 0.1, Cached: true}, {Cached: true, Err: errFragmentTooLarge}}, &FakeJudge{})
 	if want := "3 questions, 1 from the cache; so far 3 questions, 1 from the cache"; got != want {
 		t.Errorf("record = %q\nwant     %q", got, want)
 	}
 
-	got = totals.record([]Decision{{Yes: 0.9, Cached: true}})
-	if want := "1 question, 1 from the cache; so far 4 questions, 2 from the cache"; got != want {
+	// Behind a cache, a judge that counts what it is billed. The estimate is
+	// for what it was asked: the first question of each batch.
+	judge := newCachedJudge(&JevJudge{}, &memoryCache{})
+	judge.judge.(*JevJudge).billed.Store(7)
+
+	got = totals.record(asked[:1], []Decision{{Yes: 0.9, Cached: true}}, judge)
+	if want := fmt.Sprintf("1 question, 1 from the cache; so far 4 questions, 2 from the cache, ~%d tokens estimated, 7 billed", estimateTokens(asked[0])); got != want {
 		t.Errorf("record = %q\nwant     %q", got, want)
+	}
+
+	// And a cache in front of a judge that does not count.
+	got = totals.record(nil, nil, newCachedJudge(identifiedFake{&FakeJudge{}, "fake"}, &memoryCache{}))
+	if strings.Contains(got, "billed") {
+		t.Errorf("record = %q, with tokens nobody counted", got)
 	}
 }
 

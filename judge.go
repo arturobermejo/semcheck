@@ -47,6 +47,12 @@ type Judge interface {
 	Decide(ctx context.Context, questions []Question) ([]Decision, error)
 }
 
+// A meteredJudge knows how many input tokens its answers have cost so far. It
+// reports false if there is nothing behind it that counts them.
+type meteredJudge interface {
+	billedTokens() (int64, bool)
+}
+
 // consult asks the judge and checks what comes back. A Judge is code from
 // outside, or a model behind a network: its answers are input, not facts.
 func consult(ctx context.Context, judge Judge, questions []Question) ([]Decision, error) {

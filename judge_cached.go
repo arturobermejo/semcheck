@@ -41,6 +41,14 @@ type pending struct {
 
 var _ Judge = (*cachedJudge)(nil)
 
+func (c *cachedJudge) billedTokens() (int64, bool) {
+	if m, ok := c.judge.(meteredJudge); ok {
+		return m.billedTokens()
+	}
+
+	return 0, false
+}
+
 func newCachedJudge(judge cacheableJudge, cache decisionCache) *cachedJudge {
 	return &cachedJudge{judge: judge, cache: cache, warn: warn}
 }

@@ -71,12 +71,18 @@ func newFakeJev(t *testing.T, answer func(code, ask string) float64) *fakeJev {
 			answers[name] = map[string]any{"type": "noul", "noul": answer(call.State.Code, q.Instructions)}
 		}
 
-		_ = json.NewEncoder(w).Encode(map[string]any{"model": "jev-1.13.0", "answers": answers})
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"model": "jev-1.13.0", "answers": answers,
+			"usage": map[string]int{"input_tokens": fakeJevTokens, "output_tokens": 1},
+		})
 	}))
 	t.Cleanup(api.Close)
 
 	return api
 }
+
+// fakeJevTokens is what the fake API bills for every request.
+const fakeJevTokens = 100
 
 // judge returns one that does not retry.
 func (api *fakeJev) judge() *JevJudge {
@@ -484,5 +490,27 @@ func TestJevJudgeAnswerOutOfRange(t *testing.T) {
 
 	if _, err := consult(context.Background(), api.judge(), questions("a")); err == nil {
 		t.Error("want an error for a probability of 1.5")
+	}
+}
+
+func TestJevJudgeCountsTheTokensItIsBilled(t *testing.T) {
+	api := newFakeJev(t, always(0.5))
+	judge := api.judge()
+
+	if tokens, ok := judge.billedTokens(); tokens != 0 || !ok {
+		t.Fatalf("billedTokens = %d, %v before asking", tokens, ok)
+	}
+
+	// Two requests: the first two questions are about the same code.
+	batch := []Question{{Ask: "one?", Fragment: "a"}, {Ask: "two?", Fragment: "a"}, {Ask: "one?", Fragment: "b"}}
+
+	for range 2 {
+		if _, err := judge.Decide(context.Background(), batch); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if tokens, _ := judge.billedTokens(); tokens != 4*fakeJevTokens {
+		t.Errorf("billedTokens = %d, want the %d of four requests", tokens, 4*fakeJevTokens)
 	}
 }

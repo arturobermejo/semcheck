@@ -19,7 +19,7 @@ const dollarsPerMillionTokens = 0.042
 type tally struct {
 	mu        sync.Mutex
 	questions int
-	tokens    int
+	tokens    int // an estimate: of every question in a dry run, of the ones asked otherwise
 	cached    int
 
 	// seen has the questions of a dry run. The ones a package shares with its
@@ -72,13 +72,18 @@ func (t *tally) estimate(questions []Question) string {
 }
 
 // record adds the decisions of a package to the totals, and describes where
-// they came from.
-func (t *tally) record(decisions []Decision) string {
-	cached := 0
+// they came from. With a judge that counts the tokens it is billed, it sets
+// them against the estimate for the questions that were asked.
+func (t *tally) record(questions []Question, decisions []Decision, judge Judge) string {
+	cached, tokens := 0, 0
 
-	for _, d := range decisions {
-		if d.Cached && d.Err == nil {
+	for i, d := range decisions {
+		switch {
+		case d.Err != nil:
+		case d.Cached:
 			cached++
+		default:
+			tokens += estimateTokens(questions[i])
 		}
 	}
 
@@ -87,9 +92,18 @@ func (t *tally) record(decisions []Decision) string {
 
 	t.questions += len(decisions)
 	t.cached += cached
+	t.tokens += tokens
 
-	return fmt.Sprintf("%s, %d from the cache; so far %s, %d from the cache",
+	stats := fmt.Sprintf("%s, %d from the cache; so far %s, %d from the cache",
 		questionCount(len(decisions)), cached, questionCount(t.questions), t.cached)
+
+	if m, ok := judge.(meteredJudge); ok {
+		if billed, ok := m.billedTokens(); ok {
+			stats += fmt.Sprintf(", ~%d tokens estimated, %d billed", t.tokens, billed)
+		}
+	}
+
+	return stats
 }
 
 // estimateTokens is a rough guess: about four bytes of code or English for a

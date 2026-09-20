@@ -160,7 +160,7 @@ func (c *checker) run(pass *analysis.Pass) error {
 	}
 
 	if c.opts.stats && len(questions) > 0 {
-		c.opts.report("stats: " + pass.Pkg.Path() + ": " + c.totals.record(decisions))
+		c.opts.report("stats: " + pass.Pkg.Path() + ": " + c.totals.record(questions, decisions, c.judge))
 	}
 
 	if err := c.record(pass, inquiries, questions, decisions); err != nil {
