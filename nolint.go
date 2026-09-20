@@ -144,7 +144,7 @@ func silencesSemcheck(comment string) bool {
 	}
 
 	for _, name := range strings.Split(list, ",") {
-		if name = strings.ToLower(strings.TrimSpace(name)); name == PluginName || name == "all" {
+		if name = strings.ToLower(strings.TrimSpace(name)); name == analyzerName || name == "all" {
 			return true
 		}
 	}

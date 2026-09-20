@@ -1,0 +1,202 @@
+package semcheck
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func TestDefaultJudge(t *testing.T) {
+	tests := []struct {
+		env  string
+		want float64 // the answer of the judge to every question
+		err  bool
+	}{
+		{"", 0, true},
+		{"fake:0.95", 0.95, false},
+		{"fake:0", 0, false},
+		{"fake:1", 1, false},
+		{"fake:1.5", 0, true},
+		{"fake:-0.1", 0, true},
+		{"fake:high", 0, true},
+		{"fake:NaN", 0, true},
+		{"fake:", 0, true},
+		{"jev", 0, true},
+		{"broken:now", 0, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.env, func(t *testing.T) {
+			t.Setenv(JudgeEnv, tt.env)
+			t.Setenv(APIKeyEnv, "")
+
+			judge, err := DefaultJudge()
+			if tt.err {
+				if err == nil || !strings.Contains(err.Error(), JudgeEnv+"="+tt.env) {
+					t.Fatalf("error = %v, want one that shows the variable", err)
+				}
+
+				return
+			}
+
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			decisions, err := judge.Decide(context.Background(), questions("a", "b"))
+
+			if err != nil || len(decisions) != 2 || decisions[1].Yes != tt.want {
+				t.Errorf("Decide = %v, %v; want %v for every question", decisions, err, tt.want)
+			}
+		})
+	}
+}
+
+func TestDefaultJudgeIsJev(t *testing.T) {
+	t.Setenv(JudgeEnv, "")
+	t.Setenv(APIKeyEnv, testKey)
+	t.Setenv(CacheEnv, "off")
+
+	warnings := captureStderr(t)
+
+	judge, err := DefaultJudge()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cached, ok := judge.(*cachedJudge)
+	if !ok {
+		t.Fatalf("judge = %#v, want a cachedJudge", judge)
+	}
+
+	if jev, ok := cached.judge.(*JevJudge); !ok || jev.APIKey != testKey {
+		t.Errorf("it asks %#v, want a JevJudge with the key", cached.judge)
+	}
+
+	if _, ok := cached.cache.(*memoryCache); !ok {
+		t.Errorf("it keeps decisions in %#v, want a memoryCache", cached.cache)
+	}
+
+	// Nothing on disk because it was asked for: nothing to warn about.
+	if got := warnings(); got != "" {
+		t.Errorf("stderr = %q, want nothing", got)
+	}
+
+	// The variable for trying things out wins: no surprise requests.
+	t.Setenv(JudgeEnv, "fake:0.5")
+
+	if judge, _ = DefaultJudge(); judge == nil {
+		t.Fatal("no judge")
+	} else if _, ok := judge.(*FakeJudge); !ok {
+		t.Errorf("judge = %#v, want the fake one", judge)
+	}
+}
+
+func TestDefaultJudgeHasACache(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "decisions")
+
+	t.Setenv(JudgeEnv, "")
+	t.Setenv(APIKeyEnv, testKey)
+	t.Setenv(CacheEnv, dir)
+
+	judge, err := DefaultJudge()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cached, ok := judge.(*cachedJudge)
+	if !ok {
+		t.Fatalf("judge = %#v, want a cachedJudge", judge)
+	}
+
+	if jev, ok := cached.judge.(*JevJudge); !ok || jev.APIKey != testKey {
+		t.Errorf("it asks %#v, want a JevJudge with the key", cached.judge)
+	}
+
+	if disk, ok := cached.cache.(*diskCache); !ok || disk.dir != dir {
+		t.Errorf("it keeps decisions in %#v, want a diskCache in %s", cached.cache, dir)
+	}
+}
+
+// A cache that cannot be used must not keep anyone from running semcheck.
+func TestDefaultJudgeWithoutAUsableCache(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "file")
+	if err := os.WriteFile(file, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv(JudgeEnv, "")
+	t.Setenv(APIKeyEnv, testKey)
+	t.Setenv(CacheEnv, filepath.Join(file, "below"))
+
+	warnings := captureStderr(t)
+
+	judge, err := DefaultJudge()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if cached, ok := judge.(*cachedJudge); !ok || cached.cache == nil {
+		t.Errorf("judge = %#v, want a cachedJudge", judge)
+	} else if _, ok := cached.cache.(*memoryCache); !ok {
+		t.Errorf("it keeps decisions in %#v, want a memoryCache", cached.cache)
+	}
+
+	if got := warnings(); !strings.HasPrefix(got, "semcheck: warning: decisions will not be kept for the next run: cache: ") {
+		t.Errorf("stderr = %q, want a warning", got)
+	}
+}
+
+// captureStderr sends the warnings of the package to a file, and returns a
+// function that reads it.
+func captureStderr(t *testing.T) func() string {
+	t.Helper()
+
+	file, err := os.Create(filepath.Join(t.TempDir(), "stderr"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	original := stderr
+	stderr = file
+
+	t.Cleanup(func() {
+		stderr = original
+
+		file.Close()
+	})
+
+	return func() string {
+		data, err := os.ReadFile(file.Name())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		return string(data)
+	}
+}
+
+func TestDefaultJudgeWithoutKey(t *testing.T) {
+	t.Setenv(JudgeEnv, "")
+	t.Setenv(APIKeyEnv, "")
+
+	_, err := DefaultJudge()
+	if err == nil || !strings.Contains(err.Error(), APIKeyEnv) || !strings.Contains(err.Error(), JudgeEnv) {
+		t.Errorf("error = %v, want one that names both variables", err)
+	}
+}
+
+func TestDefaultJudgeBroken(t *testing.T) {
+	t.Setenv(JudgeEnv, "broken")
+
+	judge, err := DefaultJudge()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if decisions, err := judge.Decide(context.Background(), questions("a")); err == nil {
+		t.Errorf("Decide = %v, want an error", decisions)
+	}
+}

@@ -5,11 +5,16 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
 )
+
+// ConfigFile is the name of the file FindConfig looks for.
+const ConfigFile = ".semcheck.yml"
 
 // Defaults of the optional fields of a Rule.
 const (
@@ -102,6 +107,31 @@ func LoadConfig(path string) (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+// FindConfig returns the path of the ConfigFile in dir or, failing that, in the
+// closest of its parents.
+func FindConfig(dir string) (string, error) {
+	start := dir
+
+	for {
+		path := filepath.Join(dir, ConfigFile)
+
+		switch _, err := os.Stat(path); {
+		case err == nil:
+			return path, nil
+		case !errors.Is(err, fs.ErrNotExist):
+			return "", fmt.Errorf("semcheck: %w", err)
+		}
+
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			// Without rules there are no findings, which looks like clean code.
+			return "", fmt.Errorf("semcheck: no %s in %s or any of its parents", ConfigFile, start)
+		}
+
+		dir = parent
+	}
 }
 
 // loadConfigOrNearest reads the file at path or, if there is no path, the

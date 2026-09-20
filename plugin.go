@@ -11,7 +11,7 @@ import (
 
 // PluginName is the key users write under linters.settings.custom in their
 // .golangci.yml.
-const PluginName = "semcheck"
+const PluginName = analyzerName
 
 func init() {
 	register.Plugin(PluginName, newPlugin)

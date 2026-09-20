@@ -83,14 +83,21 @@ func newAnalyzer(cfg *Config, judge Judge, opts options) (*analysis.Analyzer, er
 		c.matchers[i] = must(r.Match.matcher())
 	}
 
+	return baseAnalyzer(func(pass *analysis.Pass) (any, error) {
+		return nil, c.run(pass)
+	}), nil
+}
+
+// analyzerName is also what a //nolint directive calls semcheck.
+const analyzerName = "semcheck"
+
+func baseAnalyzer(run func(*analysis.Pass) (any, error)) *analysis.Analyzer {
 	return &analysis.Analyzer{
-		Name:     "semcheck",
+		Name:     analyzerName,
 		Doc:      "checks rules written in natural language on the code that AST matchers select",
 		Requires: []*analysis.Analyzer{inspect.Analyzer},
-		Run: func(pass *analysis.Pass) (any, error) {
-			return nil, c.run(pass)
-		},
-	}, nil
+		Run:      run,
+	}
 }
 
 // A checker has what the analysis of every package shares.

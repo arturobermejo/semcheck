@@ -3,6 +3,8 @@ package semcheck
 import (
 	"errors"
 	"io/fs"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -228,4 +230,57 @@ func TestParseConfigFailOnJudgeError(t *testing.T) {
 			t.Errorf("fail_on_judge_error = %v, want %v for:\n%s", cfg.FailOnJudgeError, want, src)
 		}
 	}
+}
+
+func TestFindConfig(t *testing.T) {
+	// root/.semcheck.yml, root/a/b/.semcheck.yml and root/a/b/c/
+	root := t.TempDir()
+	deep := filepath.Join(root, "a", "b", "c")
+
+	if err := os.MkdirAll(deep, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, dir := range []string{root, filepath.Join(root, "a", "b")} {
+		if err := os.WriteFile(filepath.Join(dir, ConfigFile), nil, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	tests := []struct {
+		name string
+		from string
+		want string // directory of the file found
+	}{
+		{"in the directory itself", root, root},
+		{"in the parent", filepath.Join(root, "a"), root},
+		{"the closest one wins", deep, filepath.Join(root, "a", "b")},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := FindConfig(tt.from)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if want := filepath.Join(tt.want, ConfigFile); got != want {
+				t.Errorf("FindConfig(%s) = %s, want %s", tt.from, got, want)
+			}
+		})
+	}
+
+	t.Run("nowhere", func(t *testing.T) {
+		empty := t.TempDir()
+
+		got, err := FindConfig(empty)
+		if err == nil || got != "" {
+			t.Fatalf("FindConfig = %q, %v; want an error", got, err)
+		}
+
+		// The search ends at the root of the file system, and says where it began.
+		if !strings.Contains(err.Error(), empty) {
+			t.Errorf("error %q does not mention %s", err, empty)
+		}
+	})
 }
