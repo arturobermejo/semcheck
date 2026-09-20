@@ -4,6 +4,8 @@ A linter for Go whose rules are questions in plain English.
 
 Static analysis decides **where to look**: deterministic matchers on the syntax tree select exact nodes, such as a log call or a function named `GetSomething`. A decision model decides **whether the code is right**: it answers a closed question about each node with a probability, and semcheck reports the ones above a threshold.
 
+Two rules, as they are written in `.semcheck.yml`:
+
 ```yaml
 rules:
   - name: no-pii-in-logs
@@ -11,7 +13,14 @@ rules:
     ask: "Does this log call write personal data (names, emails, phone numbers, postal addresses, government IDs)?"
     context: statement
     min_confidence: 0.8
+
+  - name: name-matches-behavior
+    match: { func-prefix: [Get, Is, Has, Find, List, Count] }
+    ask: "Does this function modify state although its name suggests it only reads?"
+    min_confidence: 0.8
 ```
+
+**`no-pii-in-logs`** finds the four:
 
 ```go
 slog.Info("user created", "email", u.Email)     // a rule on names finds it: the key is "email"
@@ -20,7 +29,23 @@ log.Printf("created %+v", u)                    // it takes knowing the fields o
 log.Printf("welcome, %s", fullName)             // the data is inside the message
 ```
 
-semcheck finds the four. The syntax tree gives it the calls, without missing one. The type checker gives it what the text does not say: that `u` is a `User` with an `Email`. The model reads the call **with those notes**, and answers one question.
+The syntax tree gives it the calls, without missing one. The type checker gives it what the text does not say: that `u` is a `User` with an `Email`. The model reads the call **with those notes**, and answers one question.
+
+**`name-matches-behavior`** finds the function whose name says "I only look":
+
+```go
+func IsExpired(u *User) bool {
+	if time.Since(u.seen) > time.Hour {
+		delete(users, u.ID) // whoever calls IsExpired does not expect to lose the user
+		return true
+	}
+	return false
+}
+```
+
+The matcher selects every function that starts with `Is`, `Get` or `Has`; the model reads each one whole and says which ones write. No list of "functions that write" could be complete: on real code it found a `GetOrgTokenIfExists` that deletes a file and a `getQueryTableInfo` that creates a database view.
+
+On three open source projects, everything these two rules reported in the sample that was checked was right: see [Evaluation](#evaluation).
 
 It runs by itself, as a `go vet` tool and as a [golangci-lint](https://golangci-lint.run) plugin, honors `//nolint:semcheck`, and keeps the answers of the model in a cache: a run only asks about the code that changed.
 
