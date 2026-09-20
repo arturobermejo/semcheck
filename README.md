@@ -86,7 +86,7 @@ golangci-lint custom                        # builds ./custom-gcl
 ./custom-gcl run
 ```
 
-[.github/workflows/ci.yml](.github/workflows/ci.yml) runs it on every push, uploads the findings to GitHub code scanning as SARIF, and keeps the cache of answers from one run to the next.
+[.github/workflows/semcheck.yml](.github/workflows/semcheck.yml) is a GitHub Actions workflow that runs it, uploads the findings to GitHub code scanning as SARIF, and keeps the cache of answers from one run to the next. Here it only runs by hand; change its `on:` to run it on every pull request.
 
 ## Rules
 

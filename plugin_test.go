@@ -214,21 +214,19 @@ func TestGolangciLintVersionsMatch(t *testing.T) {
 		t.Errorf("Makefile installs golangci-lint %s, .custom-gcl.yml builds against %s", makefile, custom)
 	}
 
-	const workflow = ".github/workflows/ci.yml"
+	for _, workflow := range []string{".github/workflows/ci.yml", ".github/workflows/semcheck.yml"} {
+		data, err := os.ReadFile(workflow)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	data, err := os.ReadFile(workflow)
-	if err != nil {
-		t.Fatal(err)
-	}
+		versions := regexp.MustCompile(`(?m)^ +version: (\S+)$`).FindAllSubmatch(data, -1)
+		if len(versions) != 1 {
+			t.Fatalf("%s: %d golangci-lint versions, want one", workflow, len(versions))
+		}
 
-	versions := regexp.MustCompile(`(?m)^ +version: (\S+)$`).FindAllSubmatch(data, -1)
-	if len(versions) != 2 {
-		t.Fatalf("%s: %d golangci-lint versions, want the ones of its two jobs", workflow, len(versions))
-	}
-
-	for _, v := range versions {
-		if string(v[1]) != makefile {
-			t.Errorf("Makefile installs golangci-lint %s, %s runs %s", makefile, workflow, v[1])
+		if got := string(versions[0][1]); got != makefile {
+			t.Errorf("Makefile installs golangci-lint %s, %s runs %s", makefile, workflow, got)
 		}
 	}
 }
