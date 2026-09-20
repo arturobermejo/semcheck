@@ -22,7 +22,11 @@ func init() {
 // Rules written there, instead of in a file of their own, have an advantage:
 // golangci-lint knows when they change, and forgets the results it has cached.
 type pluginSettings struct {
-	File   string `yaml:"config"`
+	File string `yaml:"config"`
+
+	// Stats is the -stats flag of the command.
+	Stats bool `yaml:"stats"`
+
 	Config `yaml:",inline"`
 }
 
@@ -31,7 +35,12 @@ type plugin struct {
 }
 
 func newPlugin(settings any) (register.LinterPlugin, error) {
-	cfg, err := pluginConfig(settings)
+	s, err := readSettings(settings)
+	if err != nil {
+		return nil, err
+	}
+
+	cfg, err := s.config()
 	if err != nil {
 		return nil, err
 	}
@@ -43,6 +52,7 @@ func newPlugin(settings any) (register.LinterPlugin, error) {
 
 	analyzer, err := newAnalyzer(cfg, judge, options{
 		honorNolint: false,
+		stats:       s.Stats,
 		// Seen, not assumed: after a judge failure that is only a warning,
 		// golangci-lint reports "0 issues" for that package, without asking
 		// again, until its code changes.
@@ -55,7 +65,7 @@ func newPlugin(settings any) (register.LinterPlugin, error) {
 	return plugin{analyzer}, nil
 }
 
-func pluginConfig(settings any) (*Config, error) {
+func readSettings(settings any) (*pluginSettings, error) {
 	// golangci-lint hands the settings over as maps and slices. Through YAML
 	// they get the same strict decoding as a file.
 	data, err := yaml.Marshal(settings)
@@ -68,6 +78,12 @@ func pluginConfig(settings any) (*Config, error) {
 		return nil, fmt.Errorf("semcheck: settings: %w", err)
 	}
 
+	return &s, nil
+}
+
+// config returns the rules written in the settings or, if there are none, the
+// ones of the file they name or of the closest ConfigFile.
+func (s *pluginSettings) config() (*Config, error) {
 	switch inline := !s.isZero(); {
 	case s.File != "" && inline:
 		return nil, errors.New("semcheck: settings: give either config or the configuration itself, not both")

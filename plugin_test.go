@@ -43,6 +43,15 @@ func TestPluginRegistered(t *testing.T) {
 	}
 }
 
+func pluginConfig(settings any) (*Config, error) {
+	s, err := readSettings(settings)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.config()
+}
+
 func TestPluginConfig(t *testing.T) {
 	// The settings as golangci-lint decodes them from its own YAML.
 	inline := map[string]any{
@@ -142,6 +151,36 @@ func TestPluginInlineRules(t *testing.T) {
 	}
 }
 
+func TestPluginStats(t *testing.T) {
+	t.Setenv(JudgeEnv, "fake:0.95")
+
+	for _, stats := range []bool{false, true} {
+		output := captureStderr(t)
+
+		p, err := newPlugin(map[string]any{"stats": stats, "rules": []any{map[string]any{
+			"name": "no-pii-in-logs", "match": map[string]any{"call": []any{"p.logf"}}, "ask": "Does it log personal data?",
+		}}})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		analyzers, _ := p.BuildAnalyzers()
+
+		if diagnostics, err := runOn(t, analyzers[0], checkedSource); err != nil || len(diagnostics) != 2 {
+			t.Fatalf("diagnostics = %v, %v; want two", diagnostics, err)
+		}
+
+		want := ""
+		if stats {
+			want = "semcheck: stats: p: 2 questions, 0 from the cache; so far 2 questions, 0 from the cache\n"
+		}
+
+		if got := output(); got != want {
+			t.Errorf("stats: %v: stderr = %q, want %q", stats, got, want)
+		}
+	}
+}
+
 func TestPluginRejectsInvalidInlineRules(t *testing.T) {
 	t.Setenv(JudgeEnv, "fake:0.95")
 
@@ -173,5 +212,23 @@ func TestGolangciLintVersionsMatch(t *testing.T) {
 
 	if makefile != custom {
 		t.Errorf("Makefile installs golangci-lint %s, .custom-gcl.yml builds against %s", makefile, custom)
+	}
+
+	const workflow = ".github/workflows/ci.yml"
+
+	data, err := os.ReadFile(workflow)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	versions := regexp.MustCompile(`(?m)^ +version: (\S+)$`).FindAllSubmatch(data, -1)
+	if len(versions) != 2 {
+		t.Fatalf("%s: %d golangci-lint versions, want the ones of its two jobs", workflow, len(versions))
+	}
+
+	for _, v := range versions {
+		if string(v[1]) != makefile {
+			t.Errorf("Makefile installs golangci-lint %s, %s runs %s", makefile, workflow, v[1])
+		}
 	}
 }

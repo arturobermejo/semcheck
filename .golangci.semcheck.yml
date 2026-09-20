@@ -13,9 +13,12 @@ linters:
       semcheck:
         type: module
         description: Natural-language rules checked on exact AST nodes.
-        # No settings: the rules are the ones of .semcheck.yml. They can go
-        # here instead, under "settings: rules:", and then golangci-lint knows
-        # when they change, and does not serve stale results from its cache.
+        # The rules are the ones of .semcheck.yml. They can go here instead,
+        # under "rules:", and then golangci-lint knows when they change, and
+        # does not serve stale results from its cache.
+        settings:
+          # Tells how many decisions of every package came from the cache.
+          stats: true
 
 issues:
   max-issues-per-linter: 0
