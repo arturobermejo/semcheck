@@ -26,7 +26,6 @@ const dollarsPerMillionTokens = 0.042
 // The upper ends of the ranges that the answers are counted in.
 var ranges = []float64{0.1, 0.5, 0.8, 1}
 
-// A count is what is known of a set of questions.
 type count struct {
 	questions, findings, errors, tokens int
 
@@ -65,7 +64,6 @@ func header(first string, others ...string) string {
 	return "| " + strings.Join(columns, " | ") + " |\n|" + strings.Repeat("---|", len(columns))
 }
 
-// readJSONLines reads a file with a JSON value of type T on each line.
 func readJSONLines[T any](path string) ([]T, error) {
 	file, err := os.Open(path)
 	if err != nil {

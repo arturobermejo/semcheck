@@ -25,12 +25,10 @@ type Record struct {
 	Tokens int `json:"tokens"`
 
 	// Yes is missing in a dry run, and when the judge gave no answer.
-	Yes    *float64 `json:"yes,omitempty"`
-	Cached bool     `json:"cached,omitempty"`
-	Error  string   `json:"error,omitempty"`
-
-	// Finding tells whether the question was reported.
-	Finding bool `json:"finding"`
+	Yes     *float64 `json:"yes,omitempty"`
+	Cached  bool     `json:"cached,omitempty"`
+	Error   string   `json:"error,omitempty"`
+	Finding bool     `json:"finding"`
 }
 
 // A recorder writes records as JSON, one on each line.

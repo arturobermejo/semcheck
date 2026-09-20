@@ -59,7 +59,6 @@ type options struct {
 	// the standard error.
 	report func(string)
 
-	// record, if set, gets a Record of every question.
 	record io.Writer
 }
 

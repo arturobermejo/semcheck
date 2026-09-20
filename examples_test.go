@@ -22,10 +22,10 @@ const RecordEnv = "SEMCHECK_RECORD"
 const recordedDir = "testdata/examples/decisions"
 
 // TestExamples checks the rules of .semcheck.yml, the ones people start from,
-// and the two more of eval/rules.yml, on code that says what they must report ("// want") and, by saying nothing,
-// what they must not. The answers are real ones, recorded: the test needs no
-// network, and fails if the rules or the examples change until the answers
-// are recorded again, with "make examples".
+// and the two more of eval/rules.yml, on code that says what they must report
+// ("// want") and, by saying nothing, what they must not. The answers are real
+// ones, recorded: the test needs no network, and fails if the rules or the
+// examples change until the answers are recorded again, with "make examples".
 func TestExamples(t *testing.T) {
 	judge := examplesJudge(t)
 

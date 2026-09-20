@@ -26,7 +26,6 @@ func withoutArgs(m *matcher) func([]string) (*matcher, error) {
 	}
 }
 
-// matcher builds the matcher that spec describes.
 func (spec MatchSpec) matcher() (*matcher, error) {
 	build, ok := matcherRegistry[spec.Matcher]
 	if !ok {
