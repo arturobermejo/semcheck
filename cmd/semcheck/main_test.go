@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -323,5 +324,37 @@ func TestStandaloneStats(t *testing.T) {
 
 	if !strings.Contains(got.stderr, "semcheck: stats: ") || !strings.Contains(got.stderr, ", 0 from the cache") {
 		t.Errorf("stderr does not have the stats:\n%s", got.stderr)
+	}
+}
+
+func TestStandaloneRecord(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "record.jsonl")
+
+	got := run(t, command(t), "-record="+path, "-config=testdata/.semcheck.yml", "./testdata/hello")
+	if got.exitCode != 3 {
+		t.Fatalf("got %+v, want exit code 3", got)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// One line for each question, although the driver analyzes the package and
+	// its variant with the tests, which has the same code.
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	if len(lines) != 7 {
+		t.Fatalf("%d records, want the 7 questions of the dry run:\n%s", len(lines), data)
+	}
+
+	for _, line := range lines {
+		var record semcheck.Record
+		if err := json.Unmarshal([]byte(line), &record); err != nil {
+			t.Fatalf("%v in the line %q", err, line)
+		}
+
+		if record.Yes == nil || !filepath.IsAbs(strings.Split(record.Pos, ":")[0]) || record.Fragment == "" {
+			t.Errorf("record = %+v, want an answer, a whole path and the code", record)
+		}
 	}
 }

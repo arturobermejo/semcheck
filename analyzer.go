@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"go/token"
+	"io"
 	"os"
 	"slices"
 	"time"
@@ -57,6 +58,9 @@ type options struct {
 	// report, if set, receives what dryRun and stats have to say instead of
 	// the standard error.
 	report func(string)
+
+	// record, if set, gets a Record of every question.
+	record io.Writer
 }
 
 func newAnalyzer(cfg *Config, judge Judge, opts options) (*analysis.Analyzer, error) {
@@ -77,6 +81,10 @@ func newAnalyzer(cfg *Config, judge Judge, opts options) (*analysis.Analyzer, er
 	}
 
 	c := &checker{cfg: cfg, judge: judge, opts: opts, totals: &tally{}, matchers: make([]*matcher, len(cfg.Rules))}
+
+	if opts.record != nil {
+		c.records = &recorder{w: opts.record}
+	}
 
 	for i, r := range cfg.Rules {
 		// Validate has built it already: it cannot fail.
@@ -107,6 +115,7 @@ type checker struct {
 	judge    Judge
 	opts     options
 	totals   *tally
+	records  *recorder // nil if nobody asked for them
 }
 
 // An inquiry is a question along with where it comes from.
@@ -120,6 +129,13 @@ type finding struct {
 	confidence float64
 }
 
+// finding returns what d makes of the inquiry, if the judge is sure enough.
+func (i inquiry) finding(d Decision) (finding, bool) {
+	confidence := d.confidence(i.rule.ReportIf)
+
+	return finding{i, confidence}, confidence >= i.rule.MinConfidence
+}
+
 func (c *checker) run(pass *analysis.Pass) error {
 	inquiries, questions, err := c.inquire(pass)
 	if err != nil {
@@ -131,7 +147,7 @@ func (c *checker) run(pass *analysis.Pass) error {
 			c.opts.report("dry run: " + pass.Pkg.Path() + ": " + estimate)
 		}
 
-		return nil
+		return c.record(pass, inquiries, questions, nil)
 	}
 
 	// One batch for the whole package: round trips are what a model costs.
@@ -147,6 +163,10 @@ func (c *checker) run(pass *analysis.Pass) error {
 		c.opts.report("stats: " + pass.Pkg.Path() + ": " + c.totals.record(decisions))
 	}
 
+	if err := c.record(pass, inquiries, questions, decisions); err != nil {
+		return err
+	}
+
 	findings, failed, cause := findingsOf(inquiries, decisions)
 
 	if failed > 0 {
@@ -158,6 +178,14 @@ func (c *checker) run(pass *analysis.Pass) error {
 	report(pass, findings)
 
 	return nil
+}
+
+func (c *checker) record(pass *analysis.Pass, inquiries []inquiry, questions []Question, decisions []Decision) error {
+	if c.records == nil {
+		return nil
+	}
+
+	return c.records.add(pass, inquiries, questions, decisions)
 }
 
 // inquire returns what the rules ask about the package: the inquiries and
@@ -219,8 +247,8 @@ func findingsOf(inquiries []inquiry, decisions []Decision) (findings []finding, 
 			continue
 		}
 
-		if c := d.confidence(inquiries[i].rule.ReportIf); c >= inquiries[i].rule.MinConfidence {
-			findings = append(findings, finding{inquiries[i], c})
+		if f, ok := inquiries[i].finding(d); ok {
+			findings = append(findings, f)
 		}
 	}
 

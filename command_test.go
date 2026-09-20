@@ -102,3 +102,41 @@ func TestCommandAnalyzer(t *testing.T) {
 		}
 	})
 }
+
+func TestCommandRecord(t *testing.T) {
+	t.Setenv(JudgeEnv, "fake:0.95")
+	t.Chdir("testdata/config/project")
+
+	path := filepath.Join(t.TempDir(), "record.jsonl")
+
+	// Two programs, as "go vet" runs one for each package: the second one
+	// adds to what the first one wrote.
+	for range 2 {
+		a := newCommandAnalyzer()
+		if err := a.Flags.Set("record", path); err != nil {
+			t.Fatal(err)
+		}
+
+		if _, err := runOn(t, a, checkedSource); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if records := recordsIn(t, data); len(records) != 4 || !records[3].Finding {
+		t.Errorf("records = %+v, want the two findings of each program", records)
+	}
+
+	a := newCommandAnalyzer()
+	if err := a.Flags.Set("record", filepath.Join(path, "below-a-file")); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := runOn(t, a, checkedSource); err == nil || !strings.HasPrefix(err.Error(), "record: ") {
+		t.Errorf("error = %v, want one about the record", err)
+	}
+}
