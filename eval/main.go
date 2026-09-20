@@ -1,6 +1,9 @@
-// Command eval reads what eval/run.sh collected and prints it as tables.
+// Command eval reads what eval/run.sh collected.
 //
-//	go run ./eval [directory of results]
+//	go run ./eval           tables of what the model answered
+//	go run ./eval sample    picks the questions to label by hand
+//	go run ./eval label     asks for those labels, one question at a time
+//	go run ./eval metrics   compares the labels with what semcheck reported
 package main
 
 import (
@@ -62,7 +65,8 @@ func header(first string, others ...string) string {
 	return "| " + strings.Join(columns, " | ") + " |\n|" + strings.Repeat("---|", len(columns))
 }
 
-func readRecords(path string) ([]semcheck.Record, error) {
+// readJSONLines reads a file with a JSON value of type T on each line.
+func readJSONLines[T any](path string) ([]T, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -70,22 +74,37 @@ func readRecords(path string) ([]semcheck.Record, error) {
 	defer file.Close()
 
 	var (
-		records []semcheck.Record
-		dec     = json.NewDecoder(bufio.NewReader(file))
+		values []T
+		dec    = json.NewDecoder(bufio.NewReader(file))
 	)
 
 	for {
-		var r semcheck.Record
+		var v T
 
-		switch err := dec.Decode(&r); err {
+		switch err := dec.Decode(&v); err {
 		case nil:
-			records = append(records, r)
+			values = append(values, v)
 		case io.EOF:
-			return records, nil
+			return values, nil
 		default:
 			return nil, fmt.Errorf("%s: %w", path, err)
 		}
 	}
+}
+
+func writeJSONLines[T any](path string, values []T) error {
+	var data []byte
+
+	for _, v := range values {
+		line, err := json.Marshal(v)
+		if err != nil {
+			return err
+		}
+
+		data = append(append(data, line...), '\n')
+	}
+
+	return os.WriteFile(path, data, 0o666)
 }
 
 // summarize writes a table of the projects and another of the rules.
@@ -122,33 +141,90 @@ func summarize(w io.Writer, projects map[string][]semcheck.Record, runs map[stri
 	}
 }
 
-func main() {
-	dir := "tmp/eval/results"
-	if len(os.Args) > 1 {
-		dir = os.Args[1]
-	}
+const (
+	resultsDir = "tmp/eval/results"
+	samplePath = "tmp/eval/sample.jsonl"
+	labelsPath = "eval/labels.jsonl"
+)
 
-	paths, _ := filepath.Glob(filepath.Join(dir, "*", "records.jsonl"))
+// loadProjects reads what eval/run.sh left of every project.
+func loadProjects() (projects map[string][]semcheck.Record, runs map[string]string, err error) {
+	paths, _ := filepath.Glob(filepath.Join(resultsDir, "*", "records.jsonl"))
 	if len(paths) == 0 {
-		fmt.Fprintf(os.Stderr, "eval: no results in %s: run eval/run.sh first\n", dir)
-		os.Exit(1)
+		return nil, nil, fmt.Errorf("no results in %s: run eval/run.sh first", resultsDir)
 	}
 
-	projects, runs := map[string][]semcheck.Record{}, map[string]string{}
+	projects, runs = map[string][]semcheck.Record{}, map[string]string{}
 
 	for _, path := range paths {
 		name := filepath.Base(filepath.Dir(path))
 
-		records, err := readRecords(path)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "eval:", err)
-			os.Exit(1)
+		if projects[name], err = readJSONLines[semcheck.Record](path); err != nil {
+			return nil, nil, err
 		}
 
 		run, _ := os.ReadFile(filepath.Join(filepath.Dir(path), "run.txt"))
-
-		projects[name], runs[name] = records, strings.TrimSpace(string(run))
+		runs[name] = strings.TrimSpace(string(run))
 	}
 
-	summarize(os.Stdout, projects, runs)
+	return projects, runs, nil
+}
+
+func run(command string) error {
+	switch command {
+	case "summary":
+		projects, runs, err := loadProjects()
+		if err != nil {
+			return err
+		}
+
+		summarize(os.Stdout, projects, runs)
+
+		return nil
+	case "sample":
+		projects, _, err := loadProjects()
+		if err != nil {
+			return err
+		}
+
+		items := sample(projects)
+
+		if err := writeJSONLines(samplePath, items); err != nil {
+			return err
+		}
+
+		fmt.Printf("%d questions to label in %s\n", len(items), samplePath)
+
+		return nil
+	case "label":
+		return labelAll(os.Stdin, os.Stdout)
+	case "metrics":
+		items, err := readJSONLines[item](samplePath)
+		if err != nil {
+			return err
+		}
+
+		labels, err := readJSONLines[label](labelsPath)
+		if err != nil {
+			return err
+		}
+
+		metrics(os.Stdout, items, labels)
+
+		return nil
+	default:
+		return fmt.Errorf("unknown command %q: the commands are summary, sample, label and metrics", command)
+	}
+}
+
+func main() {
+	command := "summary"
+	if len(os.Args) > 1 {
+		command = os.Args[1]
+	}
+
+	if err := run(command); err != nil {
+		fmt.Fprintln(os.Stderr, "eval:", err)
+		os.Exit(1)
+	}
 }
