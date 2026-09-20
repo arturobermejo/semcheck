@@ -59,12 +59,12 @@ func TestRecord(t *testing.T) {
 			Package: "p", Rule: r.Name, Pos: "p.go:11:2", Ask: r.Ask,
 			Fragment: "logf(\"created %+v\", u)",
 			Types:    []string{"u: User{ID int; Email string}"},
-			Tokens:   22, Yes: ptr(0.95), Finding: true,
+			Tokens:   44, Yes: ptr(0.95), Finding: true,
 		},
 		{
 			Package: "p", Rule: r.Name, Pos: "p.go:12:2", Ask: r.Ask,
 			Fragment: "logf(\"done\")",
-			Tokens:   12, Yes: ptr(0.02),
+			Tokens:   24, Yes: ptr(0.02),
 		},
 	}
 

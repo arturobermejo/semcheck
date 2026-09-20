@@ -15,9 +15,9 @@ func TestTallyEstimate(t *testing.T) {
 	pii := Question{Rule: "no-pii-in-logs", Ask: strings.Repeat("a", 40), Fragment: strings.Repeat("f", 50), Types: []string{strings.Repeat("t", 9)}}
 	name := Question{Rule: "name-matches-behavior", Ask: strings.Repeat("a", 40), Fragment: strings.Repeat("g", 360)}
 
-	// 99 bytes are 25 tokens, and 400 are 100.
+	// 99 bytes are 50 tokens, and 400 are 200.
 	got := totals.estimate([]Question{pii, name, pii})
-	if want := "2 questions (name-matches-behavior 1, no-pii-in-logs 1), ~125 tokens; so far 2 questions, ~125 tokens, under $0.01"; got != want {
+	if want := "2 questions (name-matches-behavior 1, no-pii-in-logs 1), ~250 tokens; so far 2 questions, ~250 tokens, under $0.01"; got != want {
 		t.Errorf("estimate = %q\nwant       %q", got, want)
 	}
 
@@ -25,7 +25,7 @@ func TestTallyEstimate(t *testing.T) {
 	test := Question{Rule: "test-name-matches", Ask: "a", Fragment: strings.Repeat("h", 3)}
 
 	got = totals.estimate([]Question{name, pii, test})
-	if want := "1 question (test-name-matches 1), ~1 tokens; so far 3 questions, ~126 tokens, under $0.01"; got != want {
+	if want := "1 question (test-name-matches 1), ~2 tokens; so far 3 questions, ~252 tokens, under $0.01"; got != want {
 		t.Errorf("estimate = %q\nwant       %q", got, want)
 	}
 
@@ -102,8 +102,8 @@ func TestDryRun(t *testing.T) {
 	findingsIn(t, a, "package p\n")
 
 	want := []string{
-		"dry run: p: 2 questions (no-pii-in-logs 2), ~34 tokens; so far 2 questions, ~34 tokens, under $0.01",
-		"dry run: p: 1 question (no-pii-in-logs 1), ~13 tokens; so far 3 questions, ~47 tokens, under $0.01",
+		"dry run: p: 2 questions (no-pii-in-logs 2), ~68 tokens; so far 2 questions, ~68 tokens, under $0.01",
+		"dry run: p: 1 question (no-pii-in-logs 1), ~25 tokens; so far 3 questions, ~93 tokens, under $0.01",
 	}
 	if !slices.Equal(out.reports, want) {
 		t.Errorf("reports = %q\nwant      %q", out.reports, want)
