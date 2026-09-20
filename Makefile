@@ -1,6 +1,6 @@
 GOLANGCI_LINT_VERSION := v2.13.2
 
-.PHONY: all build fmt lint plugin test tools
+.PHONY: all build examples fmt lint plugin test tools
 
 all: fmt lint test
 
@@ -15,6 +15,11 @@ test:
 
 build:
 	go build -o semcheck ./cmd/semcheck
+
+# Asks the model again about the examples of the rules of .semcheck.yml, and
+# keeps its answers for TestExamples. Needs TYPESAFE_API_KEY.
+examples:
+	SEMCHECK_RECORD=1 go test -count=1 -run TestExamples -v .
 
 # Builds ./custom-gcl, a golangci-lint with semcheck compiled in, following
 # .custom-gcl.yml. Run it with: ./custom-gcl run -c .golangci.semcheck.yml

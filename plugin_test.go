@@ -75,7 +75,7 @@ func TestPluginConfig(t *testing.T) {
 		{name: "empty settings", settings: map[string]any{}, dir: "testdata/config/project", want: []string{"found-upwards"}},
 		{name: "other settings along with the rules", settings: map[string]any{"rules": inline["rules"], "fail_on_judge_error": true}, want: []string{"no-pii-in-logs", "doc-matches-code"}},
 
-		{name: "no settings and no file", err: "no .semcheck.yml in"},
+		{name: "no settings and no file", dir: t.TempDir(), err: "no .semcheck.yml in"},
 		{name: "a file and settings that belong in it", settings: map[string]any{"config": "x.yml", "fail_on_judge_error": true}, err: "either config or the configuration itself"},
 		{name: "both", settings: map[string]any{"config": "x.yml", "rules": inline["rules"]}, err: "either config or the configuration itself"},
 		{name: "a misspelled setting", settings: map[string]any{"confg": "x.yml"}, err: "field confg not found"},
