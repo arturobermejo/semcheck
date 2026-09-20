@@ -76,6 +76,7 @@ func TestDefaultJudge(t *testing.T) {
 		{"fake:1.5", 0, true},
 		{"fake:-0.1", 0, true},
 		{"fake:high", 0, true},
+		{"fake:NaN", 0, true},
 		{"fake:", 0, true},
 		{"jev", 0, true},
 		{"broken:now", 0, true},

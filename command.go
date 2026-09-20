@@ -123,7 +123,7 @@ func DefaultJudge() (Judge, error) {
 
 	if p, ok := strings.CutPrefix(value, "fake:"); ok {
 		yes, err := strconv.ParseFloat(p, 64)
-		if err != nil || yes < 0 || yes > 1 {
+		if err != nil || !validProbability(yes) {
 			return nil, fmt.Errorf("semcheck: %s=%s: the probability must be a number from 0 to 1", JudgeEnv, value)
 		}
 

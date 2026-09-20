@@ -59,11 +59,16 @@ func consult(ctx context.Context, judge Judge, questions []Question) ([]Decision
 			continue
 		}
 
-		// NaN fails every comparison, so it needs a check of its own.
-		if math.IsNaN(d.Yes) || d.Yes < 0 || d.Yes > 1 {
+		if !validProbability(d.Yes) {
 			return nil, fmt.Errorf("the judge gave the probability %v to question %d (rule %s)", d.Yes, i+1, questions[i].Rule)
 		}
 	}
 
 	return decisions, nil
+}
+
+// validProbability checks for NaN by itself: it fails every comparison, so it
+// would pass for a number that is neither under 0 nor over 1.
+func validProbability(p float64) bool {
+	return !math.IsNaN(p) && p >= 0 && p <= 1
 }

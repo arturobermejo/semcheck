@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io/fs"
-	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -96,7 +95,7 @@ func (d *diskCache) get(key cacheKey) (float64, bool) {
 	text, whole := strings.CutSuffix(string(data), "\n")
 
 	yes, err := strconv.ParseFloat(text, 64)
-	if !whole || err != nil || math.IsNaN(yes) || yes < 0 || yes > 1 {
+	if !whole || err != nil || !validProbability(yes) {
 		return 0, false
 	}
 
