@@ -21,6 +21,9 @@ type Record struct {
 	Fragment string   `json:"fragment"`
 	Types    []string `json:"types,omitempty"`
 
+	// Tokens is an estimate of what the model reads to answer.
+	Tokens int `json:"tokens"`
+
 	// Yes is missing in a dry run, and when the judge gave no answer.
 	Yes    *float64 `json:"yes,omitempty"`
 	Cached bool     `json:"cached,omitempty"`
@@ -59,7 +62,10 @@ func (r *recorder) add(pass *analysis.Pass, inquiries []inquiry, questions []Que
 
 		r.seen[key] = true
 
-		rec := Record{Package: pass.Pkg.Path(), Rule: q.Rule, Pos: pos, Ask: q.Ask, Fragment: q.Fragment, Types: q.Types}
+		rec := Record{
+			Package: pass.Pkg.Path(), Rule: q.Rule, Pos: pos,
+			Ask: q.Ask, Fragment: q.Fragment, Types: q.Types, Tokens: estimateTokens(q),
+		}
 
 		if decisions != nil {
 			d := decisions[i]
