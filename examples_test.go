@@ -22,34 +22,50 @@ const RecordEnv = "SEMCHECK_RECORD"
 const recordedDir = "testdata/examples/decisions"
 
 // TestExamples checks the rules of .semcheck.yml, the ones people start from,
-// on code that says what they must report ("// want") and, by saying nothing,
+// and the two more of eval/rules.yml, on code that says what they must report ("// want") and, by saying nothing,
 // what they must not. The answers are real ones, recorded: the test needs no
 // network, and fails if the rules or the examples change until the answers
 // are recorded again, with "make examples".
 func TestExamples(t *testing.T) {
-	cfg, err := LoadConfig(ConfigFile)
-	if err != nil {
-		t.Fatal(err)
+	judge := examplesJudge(t)
+
+	tests := []struct {
+		config   string
+		packages []string
+	}{
+		{ConfigFile, []string{"examples/pii", "examples/level", "examples/name"}},
+
+		// The rules that are not good enough to ship keep their examples, for
+		// the day their questions are written again.
+		{"eval/rules.yml", []string{"examples/doc", "examples/testname"}},
 	}
 
-	log := &decisionLog{}
+	for _, tt := range tests {
+		t.Run(tt.config, func(t *testing.T) {
+			cfg, err := LoadConfig(tt.config)
+			if err != nil {
+				t.Fatal(err)
+			}
 
-	a, err := newAnalyzer(cfg, &loggingJudge{examplesJudge(t), log}, options{
-		honorNolint: true,
-		warn:        func(msg string) { t.Log("warning: " + msg) },
-	})
-	if err != nil {
-		t.Fatal(err)
+			log := &decisionLog{}
+
+			a, err := newAnalyzer(cfg, &loggingJudge{judge, log}, options{
+				honorNolint: true,
+				warn:        func(msg string) { t.Log("warning: " + msg) },
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			analysistest.Run(t, analysistest.TestData(), a, tt.packages...)
+
+			for _, fragment := range log.leaks {
+				t.Errorf("a question shows its expected answer to the model:\n%s", fragment)
+			}
+
+			t.Log("\n" + log.String())
+		})
 	}
-
-	analysistest.Run(t, analysistest.TestData(), a,
-		"examples/pii", "examples/level", "examples/doc", "examples/name", "examples/testname")
-
-	for _, fragment := range log.leaks {
-		t.Errorf("a question shows its expected answer to the model:\n%s", fragment)
-	}
-
-	t.Log("\n" + log.String())
 }
 
 func examplesJudge(t *testing.T) Judge {

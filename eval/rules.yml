@@ -1,17 +1,8 @@
-# The rules semcheck ships as a starting point, and checks its own code with.
-# Copy this file to the root of a project and adapt it.
-#
-# Each rule has examples of what it must and must not report in
-# testdata/src/examples, checked against real answers of the model (see
-# examples_test.go), and was measured on three open source projects (see
-# eval/). Two more rules that were measured are not here, because most of what
-# they reported was wrong: eval/rules.yml has them.
-#
-# About min_confidence. On the examples the model says 0.9 or more for what is
-# wrong and 0.3 or less for what is not, and it moves a few hundredths from one
-# run to the next: 0.8 is far from both. The level of a log is more of a
-# judgment call, and the model is less sure about it: that rule asks for 0.7,
-# under which most of what it reported on real code was wrong.
+# The five rules that were evaluated (see eval/run.sh), kept as they were so
+# that the evaluation can be repeated. Three of them are the ones semcheck
+# ships, in .semcheck.yml. The other two, doc-matches-code and
+# test-name-matches, were right in a third and a tenth of what they reported:
+# their matchers are fine, their questions are not good enough yet.
 rules:
   # The model reads the log call along with the types of what it logs: that u
   # is a *User with an Email field is what makes log.Printf("%+v", u) a finding.
@@ -56,10 +47,22 @@ rules:
     ask: "Does the level of this log call contradict its message: a failure or an error logged at debug or info level, or a normal event logged at error level?"
     message: the level of this log does not fit its message
     context: statement
-    min_confidence: 0.7
+    min_confidence: 0.6
+
+  - name: doc-matches-code
+    match: exported-func-doc
+    ask: "Does the doc comment say something about the function that its code contradicts?"
+    message: the doc comment says something the code does not do
+    min_confidence: 0.8
 
   - name: name-matches-behavior
     match: { func-prefix: [Get, Is, Has, Find, List, Count] }
     ask: "Does this function modify state although its name suggests it only reads?"
     message: the name suggests that the function only reads
+    min_confidence: 0.8
+
+  - name: test-name-matches
+    match: test-func
+    ask: "Does this test check something different from what its name says it checks?"
+    message: the name says something the test does not check
     min_confidence: 0.8

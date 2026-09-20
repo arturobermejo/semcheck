@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Runs semcheck, with the rules of .semcheck.yml, on the projects of
+# Runs semcheck, with the rules of eval/rules.yml, on the projects of
 # eval/repos.txt, and leaves what it says of each in tmp/eval/results/<name>:
 #
 #   records.jsonl  every question and its answer (see the -record flag)
@@ -52,7 +52,7 @@ while read -r name url commit packages; do
 
 	# Word splitting of $packages is wanted: it may be several patterns.
 	# shellcheck disable=SC2086
-	(cd "$dir" && "$work/semcheck" -config="$root/.semcheck.yml" "${flags[@]}" -record="$out/records.jsonl" $packages) \
+	(cd "$dir" && "$work/semcheck" -config="$root/eval/rules.yml" "${flags[@]}" -record="$out/records.jsonl" $packages) \
 		>"$out/log.txt" 2>&1 || code=$?
 
 	echo "exit=$code seconds=$((SECONDS - start))" | tee "$out/run.txt"
