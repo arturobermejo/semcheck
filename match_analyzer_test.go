@@ -11,7 +11,7 @@ import (
 
 // newMatchAnalyzer returns an analysis that reports every node the matchers
 // select, to test them without rules or a judge.
-func newMatchAnalyzer(matchers ...*Matcher) *analysis.Analyzer {
+func newMatchAnalyzer(matchers ...*matcher) *analysis.Analyzer {
 	return &analysis.Analyzer{
 		Name:     "semcheck",
 		Doc:      "reports the nodes selected by the semcheck matchers",
@@ -25,8 +25,8 @@ func newMatchAnalyzer(matchers ...*Matcher) *analysis.Analyzer {
 			var findings []finding
 
 			for _, m := range matchers {
-				for _, match := range m.matches(pass) {
-					findings = append(findings, finding{match.Pos, m.Name})
+				for _, hit := range m.matches(pass) {
+					findings = append(findings, finding{hit.Pos, m.Name})
 				}
 			}
 

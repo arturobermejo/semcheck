@@ -10,17 +10,17 @@ import (
 
 // exportedFuncDoc selects the exported functions and methods that have a doc
 // comment.
-var exportedFuncDoc = &Matcher{
+var exportedFuncDoc = &matcher{
 	Name:  "exported-func-doc",
 	Types: []ast.Node{(*ast.FuncDecl)(nil)},
-	Match: func(_ *analysis.Pass, cur inspector.Cursor) (Match, bool) {
+	Match: func(_ *analysis.Pass, cur inspector.Cursor) (match, bool) {
 		fn := cur.Node().(*ast.FuncDecl)
 		// Without a body there is no behavior to compare the comment with.
 		if fn.Body == nil || !isExportedFunc(fn) || !hasDoc(fn) {
-			return Match{}, false
+			return match{}, false
 		}
 
-		return Match{Node: fn, Pos: fn.Name.Pos()}, true
+		return match{Node: fn, Pos: fn.Name.Pos()}, true
 	},
 }
 

@@ -76,7 +76,7 @@ func newAnalyzer(cfg *Config, judge Judge, opts options) (*analysis.Analyzer, er
 		return nil, errors.New("semcheck: there is no judge")
 	}
 
-	c := &checker{cfg: cfg, judge: judge, opts: opts, totals: &tally{}, matchers: make([]*Matcher, len(cfg.Rules))}
+	c := &checker{cfg: cfg, judge: judge, opts: opts, totals: &tally{}, matchers: make([]*matcher, len(cfg.Rules))}
 
 	for i, r := range cfg.Rules {
 		// Validate has built it already: it cannot fail.
@@ -103,7 +103,7 @@ func baseAnalyzer(run func(*analysis.Pass) (any, error)) *analysis.Analyzer {
 // A checker has what the analysis of every package shares.
 type checker struct {
 	cfg      *Config
-	matchers []*Matcher // one for each rule of cfg
+	matchers []*matcher // one for each rule of cfg
 	judge    Judge
 	opts     options
 	totals   *tally
@@ -175,19 +175,19 @@ func (c *checker) inquire(pass *analysis.Pass) ([]inquiry, []Question, error) {
 	}
 
 	for i, r := range c.cfg.Rules {
-		for _, match := range c.matchers[i].matches(pass) {
-			if inTestFile(pass, match.Node) && !r.Tests && !c.matchers[i].ForTests {
+		for _, m := range c.matchers[i].matches(pass) {
+			if inTestFile(pass, m.Node) && !r.Tests && !c.matchers[i].ForTests {
 				continue
 			}
 
 			// Before asking: a finding nobody will see is not worth a question.
-			if silenced.covers(pass.Fset, match.Pos) {
+			if silenced.covers(pass.Fset, m.Pos) {
 				continue
 			}
 
-			text, err := fragment(pass, match, r.Context)
+			text, err := fragment(pass, m, r.Context)
 			if errors.Is(err, errFragmentTooLarge) {
-				tooLarge = append(tooLarge, match.Pos)
+				tooLarge = append(tooLarge, m.Pos)
 
 				continue
 			}
@@ -196,8 +196,8 @@ func (c *checker) inquire(pass *analysis.Pass) ([]inquiry, []Question, error) {
 				return nil, nil, err
 			}
 
-			inquiries = append(inquiries, inquiry{r, match.Pos})
-			questions = append(questions, Question{Rule: r.Name, Ask: r.Ask, Fragment: text, Types: typeNotes(pass, match)})
+			inquiries = append(inquiries, inquiry{r, m.Pos})
+			questions = append(questions, Question{Rule: r.Name, Ask: r.Ask, Fragment: text, Types: typeNotes(pass, m)})
 		}
 	}
 

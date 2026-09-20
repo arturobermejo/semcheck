@@ -121,7 +121,7 @@ func TestCallPatternMatches(t *testing.T) {
 
 // describe spells out the function and the statement around a match, which
 // the regular match analyzer does not report.
-func describe(pass *analysis.Pass, m Match) string {
+func describe(pass *analysis.Pass, m match) string {
 	var where string
 
 	switch fn := m.Func.(type) {
@@ -148,9 +148,9 @@ func TestMatchSurroundings(t *testing.T) {
 		Doc:      "reports the function and the statement around each match",
 		Requires: []*analysis.Analyzer{inspect.Analyzer},
 		Run: func(pass *analysis.Pass) (any, error) {
-			for _, m := range []*Matcher{m, exportedFuncDoc} {
-				for _, match := range m.matches(pass) {
-					pass.Reportf(match.Pos, "%s", describe(pass, match))
+			for _, m := range []*matcher{m, exportedFuncDoc} {
+				for _, hit := range m.matches(pass) {
+					pass.Reportf(hit.Pos, "%s", describe(pass, hit))
 				}
 			}
 

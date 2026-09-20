@@ -67,8 +67,8 @@ func (t *tally) estimate(questions []Question) string {
 	t.tokens += tokens
 
 	return fmt.Sprintf("%s (%s), ~%d tokens; so far %s, ~%d tokens, %s",
-		plural(count, "question"), strings.Join(byRule, ", "), tokens,
-		plural(t.questions, "question"), t.tokens, dollars(t.tokens))
+		questionCount(count), strings.Join(byRule, ", "), tokens,
+		questionCount(t.questions), t.tokens, dollars(t.tokens))
 }
 
 // record adds the decisions of a package to the totals, and describes where
@@ -89,7 +89,7 @@ func (t *tally) record(decisions []Decision) string {
 	t.cached += cached
 
 	return fmt.Sprintf("%s, %d from the cache; so far %s, %d from the cache",
-		plural(len(decisions), "question"), cached, plural(t.questions, "question"), t.cached)
+		questionCount(len(decisions)), cached, questionCount(t.questions), t.cached)
 }
 
 // estimateTokens is a rough guess: about four bytes of code or English for a
@@ -112,10 +112,10 @@ func dollars(tokens int) string {
 	return fmt.Sprintf("~$%.2f", cost)
 }
 
-func plural(n int, noun string) string {
+func questionCount(n int) string {
 	if n == 1 {
-		return "1 " + noun
+		return "1 question"
 	}
 
-	return fmt.Sprintf("%d %ss", n, noun)
+	return fmt.Sprintf("%d questions", n)
 }

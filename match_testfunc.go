@@ -10,18 +10,18 @@ import (
 )
 
 // testFunc selects the test functions: TestXxx(*testing.T) in _test.go files.
-var testFunc = &Matcher{
+var testFunc = &matcher{
 	Name:     "test-func",
 	Types:    []ast.Node{(*ast.FuncDecl)(nil)},
 	ForTests: true,
-	Match: func(pass *analysis.Pass, cur inspector.Cursor) (Match, bool) {
+	Match: func(pass *analysis.Pass, cur inspector.Cursor) (match, bool) {
 		fn := cur.Node().(*ast.FuncDecl)
 
 		if fn.Body == nil || !isTestName(fn.Name.Name) || !inTestFile(pass, fn) || !hasTestSignature(pass, fn) {
-			return Match{}, false
+			return match{}, false
 		}
 
-		return Match{Node: fn, Pos: fn.Name.Pos()}, true
+		return match{Node: fn, Pos: fn.Name.Pos()}, true
 	},
 }
 
@@ -50,4 +50,23 @@ func hasTestSignature(pass *analysis.Pass, fn *ast.FuncDecl) bool {
 		sig.Results().Len() == 0 &&
 		sig.Params().Len() == 1 &&
 		isPointerTo(sig.Params().At(0).Type(), "testing", "T")
+}
+
+// isNamed reports whether t is the type pkgPath.name, however the source code
+// spells it: through a renamed import, a dot import or a type alias.
+func isNamed(t types.Type, pkgPath, name string) bool {
+	named, ok := types.Unalias(t).(*types.Named)
+	if !ok {
+		return false
+	}
+
+	obj := named.Obj()
+
+	return obj.Name() == name && obj.Pkg() != nil && obj.Pkg().Path() == pkgPath
+}
+
+func isPointerTo(t types.Type, pkgPath, name string) bool {
+	ptr, ok := types.Unalias(t).(*types.Pointer)
+
+	return ok && isNamed(ptr.Elem(), pkgPath, name)
 }

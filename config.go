@@ -85,6 +85,7 @@ type MatchSpec struct {
 // An Answer is one side of a closed question.
 type Answer string
 
+// The two answers.
 const (
 	AnswerYes Answer = "yes"
 	AnswerNo  Answer = "no"
@@ -227,6 +228,7 @@ func (a *Answer) UnmarshalYAML(node *yaml.Node) error {
 	return fmt.Errorf("line %d: report_if must be yes or no", node.Line)
 }
 
+// UnmarshalYAML accepts the three ways to write a match.
 func (spec *MatchSpec) UnmarshalYAML(node *yaml.Node) error {
 	if node.Kind == yaml.ScalarNode && node.Value != "" {
 		*spec = MatchSpec{Matcher: node.Value}

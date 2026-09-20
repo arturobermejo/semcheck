@@ -87,7 +87,7 @@ func (r Rule) problems() []error {
 	return problems
 }
 
-func selectsFunctions(m *Matcher) bool {
+func selectsFunctions(m *matcher) bool {
 	for _, t := range m.Types {
 		if _, ok := t.(*ast.FuncDecl); !ok {
 			return false

@@ -13,9 +13,9 @@ import (
 	"golang.org/x/tools/go/ast/inspector"
 )
 
-// matchAt parses src and builds the Match for its first node accepted by pick,
-// the same way Matcher.matches does.
-func matchAt(t *testing.T, src string, pick func(ast.Node) bool, otherFiles ...string) (*analysis.Pass, Match) {
+// matchAt parses src and builds the match for its first node accepted by pick,
+// the same way matcher.matches does.
+func matchAt(t *testing.T, src string, pick func(ast.Node) bool, otherFiles ...string) (*analysis.Pass, match) {
 	t.Helper()
 
 	pass := &analysis.Pass{Fset: token.NewFileSet()}
@@ -31,7 +31,7 @@ func matchAt(t *testing.T, src string, pick func(ast.Node) bool, otherFiles ...s
 
 	for cur := range inspector.New(pass.Files).Root().Preorder() {
 		if pick(cur.Node()) {
-			return pass, Match{
+			return pass, match{
 				Node: cur.Node(),
 				Pos:  cur.Node().Pos(),
 				Func: enclosingFunc(cur),
@@ -42,7 +42,7 @@ func matchAt(t *testing.T, src string, pick func(ast.Node) bool, otherFiles ...s
 
 	t.Fatal("no node was picked")
 
-	return nil, Match{}
+	return nil, match{}
 }
 
 // isCall picks the call whose function is written as name, e.g. "log.Printf".

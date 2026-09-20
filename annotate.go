@@ -26,7 +26,7 @@ const (
 // typeNotes lists, as "name: type" lines in order of appearance, the variables
 // used in the matched node whose type says something the code does not: that u
 // is a User with an Email field, or db a *sql.DB. The model sees text only.
-func typeNotes(pass *analysis.Pass, m Match) []string {
+func typeNotes(pass *analysis.Pass, m match) []string {
 	var (
 		notes []string
 		seen  = map[*types.Var]bool{}

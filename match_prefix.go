@@ -16,7 +16,7 @@ import (
 
 // funcPrefix selects the functions and methods whose name starts with one of
 // the given words, such as Get, Is or Has.
-func funcPrefix(prefixes ...string) (*Matcher, error) {
+func funcPrefix(prefixes ...string) (*matcher, error) {
 	if len(prefixes) == 0 {
 		return nil, errors.New("func-prefix needs at least one prefix")
 	}
@@ -29,22 +29,22 @@ func funcPrefix(prefixes ...string) (*Matcher, error) {
 
 	prefixes = slices.Clone(prefixes)
 
-	return &Matcher{
+	return &matcher{
 		Name:  "func-prefix",
 		Types: []ast.Node{(*ast.FuncDecl)(nil)},
-		Match: func(_ *analysis.Pass, cur inspector.Cursor) (Match, bool) {
+		Match: func(_ *analysis.Pass, cur inspector.Cursor) (match, bool) {
 			fn := cur.Node().(*ast.FuncDecl)
 
 			// Without a body there is no behavior to compare the name with.
 			if fn.Body == nil {
-				return Match{}, false
+				return match{}, false
 			}
 
 			if !slices.ContainsFunc(prefixes, func(p string) bool { return hasWordPrefix(fn.Name.Name, p) }) {
-				return Match{}, false
+				return match{}, false
 			}
 
-			return Match{Node: fn, Pos: fn.Name.Pos()}, true
+			return match{Node: fn, Pos: fn.Name.Pos()}, true
 		},
 	}, nil
 }

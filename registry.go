@@ -9,15 +9,15 @@ import (
 
 // matcherRegistry maps the names users write in a "match" field to the
 // functions that build the matchers.
-var matcherRegistry = map[string]func(args []string) (*Matcher, error){
-	"call":              func(args []string) (*Matcher, error) { return callTo(args...) },
+var matcherRegistry = map[string]func(args []string) (*matcher, error){
+	"call":              func(args []string) (*matcher, error) { return callTo(args...) },
 	"exported-func-doc": withoutArgs(exportedFuncDoc),
-	"func-prefix":       func(args []string) (*Matcher, error) { return funcPrefix(args...) },
+	"func-prefix":       func(args []string) (*matcher, error) { return funcPrefix(args...) },
 	"test-func":         withoutArgs(testFunc),
 }
 
-func withoutArgs(m *Matcher) func([]string) (*Matcher, error) {
-	return func(args []string) (*Matcher, error) {
+func withoutArgs(m *matcher) func([]string) (*matcher, error) {
+	return func(args []string) (*matcher, error) {
 		if len(args) > 0 {
 			return nil, fmt.Errorf("%s takes no arguments", m.Name)
 		}
@@ -27,7 +27,7 @@ func withoutArgs(m *Matcher) func([]string) (*Matcher, error) {
 }
 
 // matcher builds the matcher that spec describes.
-func (spec MatchSpec) matcher() (*Matcher, error) {
+func (spec MatchSpec) matcher() (*matcher, error) {
 	build, ok := matcherRegistry[spec.Matcher]
 	if !ok {
 		known := strings.Join(slices.Sorted(maps.Keys(matcherRegistry)), ", ")

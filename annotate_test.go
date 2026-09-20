@@ -114,7 +114,7 @@ func notesOf(t *testing.T, params, body string) []string {
 		t.Fatal("no statement is a call")
 	}
 
-	return typeNotes(pass, Match{Node: call})
+	return typeNotes(pass, match{Node: call})
 }
 
 func TestTypeNotes(t *testing.T) {

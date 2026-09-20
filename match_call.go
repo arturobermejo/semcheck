@@ -20,7 +20,7 @@ import (
 // Of several matching calls nested in one another, as in a fluent chain
 // log.Info().Str("k", v).Msg("m") or in slog.Info("m", slog.String("k", v)),
 // only the outermost is selected: it contains the others.
-func callTo(patterns ...string) (*Matcher, error) {
+func callTo(patterns ...string) (*matcher, error) {
 	if len(patterns) == 0 {
 		return nil, errors.New("call needs at least one pattern")
 	}
@@ -40,13 +40,13 @@ func callTo(patterns ...string) (*Matcher, error) {
 		return ok && slices.ContainsFunc(parsed, func(p callPattern) bool { return p.matches(fn) })
 	}
 
-	return &Matcher{
+	return &matcher{
 		Name:  "call",
 		Types: []ast.Node{(*ast.CallExpr)(nil)},
-		Match: func(pass *analysis.Pass, cur inspector.Cursor) (Match, bool) {
+		Match: func(pass *analysis.Pass, cur inspector.Cursor) (match, bool) {
 			call := cur.Node().(*ast.CallExpr)
 			if !matches(pass, call) {
-				return Match{}, false
+				return match{}, false
 			}
 
 			for c := range cur.Parent().Enclosing((*ast.CallExpr)(nil), (*ast.FuncLit)(nil)) {
@@ -56,11 +56,11 @@ func callTo(patterns ...string) (*Matcher, error) {
 				}
 
 				if matches(pass, outer) {
-					return Match{}, false
+					return match{}, false
 				}
 			}
 
-			return Match{Node: call, Pos: call.Pos()}, true
+			return match{Node: call, Pos: call.Pos()}, true
 		},
 	}, nil
 }

@@ -23,6 +23,7 @@ type FakeJudge struct {
 
 var _ Judge = (*FakeJudge)(nil)
 
+// Decide answers every question with Answer, or fails with Err.
 func (f *FakeJudge) Decide(ctx context.Context, questions []Question) ([]Decision, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err

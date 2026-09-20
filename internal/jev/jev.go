@@ -19,6 +19,7 @@ import (
 	"time"
 )
 
+// What a Client with empty fields uses.
 const (
 	DefaultURL   = "https://api.typesafe.ai"
 	DefaultModel = "jev-latest"
@@ -87,6 +88,7 @@ type Response struct {
 	Usage   Usage             `json:"usage"`
 }
 
+// An Answer is what the API gives for one question.
 type Answer struct {
 	Type string `json:"type"`
 
@@ -94,6 +96,7 @@ type Answer struct {
 	Noul *float64 `json:"noul"`
 }
 
+// Usage is what a request is billed for.
 type Usage struct {
 	InputTokens  int `json:"input_tokens"`
 	OutputTokens int `json:"output_tokens"`

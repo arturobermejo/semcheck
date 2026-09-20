@@ -33,7 +33,7 @@ var errFragmentTooLarge = errors.New("fragment too large")
 // scope returns the node that stands for m in the given context. When there is
 // no function or statement around m, as for a declaration or a call at package
 // level, it is the matched node itself.
-func (m Match) scope(ctx Context) ast.Node {
+func (m match) scope(ctx Context) ast.Node {
 	switch {
 	case ctx == ContextFunction && m.Func != nil:
 		return m.Func
@@ -48,7 +48,7 @@ func (m Match) scope(ctx Context) ast.Node {
 // syntax tree instead of copying the file, so that the text does not depend on
 // the indentation or the spacing of the original, and on nothing outside the
 // node: the same code gives the same fragment, which is what makes it cacheable.
-func fragment(pass *analysis.Pass, m Match, ctx Context) (string, error) {
+func fragment(pass *analysis.Pass, m match, ctx Context) (string, error) {
 	node := m.scope(ctx)
 
 	// A plain node is printed without the comments inside it: they are not
