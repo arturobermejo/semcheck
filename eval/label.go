@@ -14,6 +14,11 @@ import (
 type label struct {
 	ID     string `json:"id"`
 	Answer string `json:"answer"` // yes, no or unsure
+
+	// By tells a label given at the prompt of this program, "hand", from one
+	// that comes from somewhere else, such as a language model.
+	By  string `json:"by"`
+	Why string `json:"why,omitempty"`
 }
 
 var answers = map[string]string{"y": "yes", "n": "no", "u": "unsure"}
@@ -83,7 +88,7 @@ func askLabels(in io.Reader, out, keep io.Writer, items []item, labels []label) 
 			}
 
 			if answer, ok := answers[key]; ok {
-				line, _ := json.Marshal(label{it.ID, answer})
+				line, _ := json.Marshal(label{ID: it.ID, Answer: answer, By: "hand"})
 				if _, err := keep.Write(append(line, '\n')); err != nil {
 					return err
 				}

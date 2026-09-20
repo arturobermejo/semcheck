@@ -30,7 +30,7 @@ type tally struct {
 	modelYes float64 // the sum of what the model answered for the labeled ones
 }
 
-// estimatedYes is how many questions of the stratum a person would say yes to,
+// estimatedYes is how many questions of the stratum would be labeled yes,
 // if the ones labeled are like the rest.
 func (t tally) estimatedYes() float64 {
 	if t.labeled == 0 {
@@ -96,7 +96,7 @@ func metrics(w io.Writer, items []item, labels []label) {
 			ratio(float64(found.yes), float64(found.labeled)), missed, ratio(found.estimatedYes(), found.estimatedYes()+missed))
 	}
 
-	fmt.Fprintln(w, "\n| Rule | Stratum | Questions | Labeled | Unsure | Model says yes | People say yes |\n|---|---|---|---|---|---|---|")
+	fmt.Fprintln(w, "\n| Rule | Stratum | Questions | Labeled | Unsure | Model says yes | Labels say yes |\n|---|---|---|---|---|---|---|")
 
 	for _, rule := range rulesOf(items) {
 		for _, stratum := range strata {

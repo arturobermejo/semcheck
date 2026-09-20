@@ -58,11 +58,11 @@ func TestAskLabels(t *testing.T) {
 
 	// "pii b" has its label. An answer that is none is asked again; then the
 	// work is left, with one question to go.
-	if err := askLabels(strings.NewReader("maybe\nY\nq\n"), &out, &kept, items, []label{{"pii b", "no"}}); err != nil {
+	if err := askLabels(strings.NewReader("maybe\nY\nq\n"), &out, &kept, items, []label{{ID: "pii b", Answer: "no"}}); err != nil {
 		t.Fatal(err)
 	}
 
-	if want := `{"id":"doc c","answer":"yes"}` + "\n"; kept.String() != want {
+	if want := `{"id":"doc c","answer":"yes","by":"hand"}` + "\n"; kept.String() != want {
 		t.Errorf("kept %q, want %q", kept.String(), want)
 	}
 
@@ -88,16 +88,16 @@ func TestMetrics(t *testing.T) {
 	}
 
 	labels := []label{
-		{"f1", "yes"},
-		{"f2", "yes"},
-		{"f3", "yes"},
-		{"f4", "no"},
-		{"n1", "yes"},
-		{"n2", "no"},
-		{"l1", "no"},
-		{"l2", "unsure"},
-		{"f4", "unsure"},
-		{"f4", "no"}, // changed twice: the last one counts
+		{ID: "f1", Answer: "yes"},
+		{ID: "f2", Answer: "yes"},
+		{ID: "f3", Answer: "yes"},
+		{ID: "f4", Answer: "no"},
+		{ID: "n1", Answer: "yes"},
+		{ID: "n2", Answer: "no"},
+		{ID: "l1", Answer: "no"},
+		{ID: "l2", Answer: "unsure"},
+		{ID: "f4", Answer: "unsure"},
+		{ID: "f4", Answer: "no"}, // changed twice: the last one counts
 	}
 
 	var out strings.Builder
@@ -110,7 +110,7 @@ func TestMetrics(t *testing.T) {
 |---|---|---|---|---|---|---|
 | pii | 20 | 4 | 3 | 75% | 5 | 75% |
 
-| Rule | Stratum | Questions | Labeled | Unsure | Model says yes | People say yes |
+| Rule | Stratum | Questions | Labeled | Unsure | Model says yes | Labels say yes |
 |---|---|---|---|---|---|---|
 | pii | finding | 20 | 4 | 0 | 90% | 75% |
 | pii | near | 10 | 2 | 0 | 60% | 50% |
