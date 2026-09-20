@@ -162,7 +162,7 @@ func withCache(judge cacheableJudge) Judge {
 	}
 
 	if err != nil {
-		warn("decisions will not be kept for the next run: " + strings.TrimPrefix(err.Error(), "semcheck: "))
+		warn("decisions will not be kept for the next run: " + err.Error())
 
 		return newCachedJudge(judge, &memoryCache{})
 	}

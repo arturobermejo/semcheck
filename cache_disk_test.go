@@ -173,7 +173,7 @@ func TestDiskCacheErrors(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if c, err := openDiskCache(filepath.Join(file, "below")); err == nil || !strings.HasPrefix(err.Error(), "semcheck: cache: ") {
+	if c, err := openDiskCache(filepath.Join(file, "below")); err == nil || !strings.HasPrefix(err.Error(), "cache: ") {
 		t.Errorf("openDiskCache below a file = %v, %v; want an error", c, err)
 	}
 
@@ -202,7 +202,7 @@ func TestDiskCacheErrors(t *testing.T) {
 
 			t.Cleanup(func() { _ = os.Chmod(locked, 0o700) })
 
-			if err := c.put(key, 0.5); err == nil || !strings.HasPrefix(err.Error(), "semcheck: cache: ") {
+			if err := c.put(key, 0.5); err == nil || !strings.HasPrefix(err.Error(), "cache: ") {
 				t.Errorf("put = %v, want an error", err)
 			}
 

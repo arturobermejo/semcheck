@@ -43,7 +43,7 @@ func cacheDir() (string, error) {
 	case "":
 		base, err := os.UserCacheDir()
 		if err != nil {
-			return "", fmt.Errorf("semcheck: %w (set %s to a directory, or to off)", err, CacheEnv)
+			return "", fmt.Errorf("%w (set %s to a directory, or to off)", err, CacheEnv)
 		}
 
 		return filepath.Join(base, "semcheck"), nil
@@ -63,7 +63,7 @@ var _ decisionCache = (*diskCache)(nil)
 
 func openDiskCache(dir string) (*diskCache, error) {
 	if err := os.MkdirAll(dir, 0o777); err != nil {
-		return nil, fmt.Errorf("semcheck: cache: %w", err)
+		return nil, fmt.Errorf("cache: %w", err)
 	}
 
 	d := &diskCache{dir}
@@ -113,7 +113,7 @@ func (d *diskCache) put(key cacheKey, yes float64) error {
 	data := strconv.FormatFloat(yes, 'g', -1, 64) + "\n"
 
 	if err := writeWhole(d.path(key), data); err != nil {
-		return fmt.Errorf("semcheck: cache: %w", err)
+		return fmt.Errorf("cache: %w", err)
 	}
 
 	return nil

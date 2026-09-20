@@ -233,8 +233,8 @@ func TestCachedJudgeWarnsOnceWhenItCannotKeep(t *testing.T) {
 		}
 	}
 
-	if len(warnings) != 1 || !strings.Contains(warnings[0], "disk full") {
-		t.Errorf("warnings = %q, want one about the disk", warnings)
+	if want := []string{"decisions are not being kept: disk full"}; !slices.Equal(warnings, want) {
+		t.Errorf("warnings = %q, want %q", warnings, want)
 	}
 }
 
