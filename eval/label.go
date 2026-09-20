@@ -46,9 +46,11 @@ func labelAll(in io.Reader, out io.Writer) error {
 }
 
 func askLabels(in io.Reader, out, keep io.Writer, items []item, labels []label) error {
+	// Only the labels given here are final: one that comes from somewhere else
+	// is asked about, and the answer replaces it.
 	done := map[string]bool{}
 	for _, l := range labels {
-		done[l.ID] = true
+		done[l.ID] = l.By == "hand"
 	}
 
 	// One rule after the other, to answer the same question many times in a

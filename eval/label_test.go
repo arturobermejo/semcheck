@@ -56,9 +56,12 @@ func TestAskLabels(t *testing.T) {
 
 	var out, kept strings.Builder
 
-	// "pii b" has its label. An answer that is none is asked again; then the
-	// work is left, with one question to go.
-	if err := askLabels(strings.NewReader("maybe\nY\nq\n"), &out, &kept, items, []label{{ID: "pii b", Answer: "no"}}); err != nil {
+	// "pii b" has its label, and "doc c" one that was not given by hand, which
+	// does not count. An answer that is none is asked again; then the work is
+	// left, with one question to go.
+	labels := []label{{ID: "pii b", Answer: "no", By: "hand"}, {ID: "doc c", Answer: "no", By: "claude"}}
+
+	if err := askLabels(strings.NewReader("maybe\nY\nq\n"), &out, &kept, items, labels); err != nil {
 		t.Fatal(err)
 	}
 
