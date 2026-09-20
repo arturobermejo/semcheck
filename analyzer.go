@@ -20,6 +20,8 @@ import (
 // exactly like "nothing was found".
 var stderr = os.Stderr
 
+func warn(msg string) { fmt.Fprintln(stderr, "semcheck: warning: "+msg) }
+
 // judgeTimeout bounds the questions of one package. An analysis.Pass brings no
 // context of its own: go/analysis was designed for analyzers that do not wait.
 const judgeTimeout = 2 * time.Minute
@@ -52,7 +54,7 @@ func newAnalyzer(cfg *Config, judge Judge, opts options) (*analysis.Analyzer, er
 	}
 
 	if opts.warn == nil {
-		opts.warn = func(msg string) { fmt.Fprintln(stderr, "semcheck: warning: "+msg) }
+		opts.warn = warn
 	}
 
 	matchers := make([]*Matcher, len(cfg.Rules))

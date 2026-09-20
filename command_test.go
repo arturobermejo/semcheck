@@ -111,6 +111,9 @@ func TestDefaultJudge(t *testing.T) {
 func TestDefaultJudgeIsJev(t *testing.T) {
 	t.Setenv(JudgeEnv, "")
 	t.Setenv(APIKeyEnv, testKey)
+	t.Setenv(CacheEnv, "off")
+
+	warnings := captureStderr(t)
 
 	judge, err := DefaultJudge()
 	if err != nil {
@@ -121,6 +124,11 @@ func TestDefaultJudgeIsJev(t *testing.T) {
 		t.Errorf("judge = %#v, want a JevJudge with the key", judge)
 	}
 
+	// Without a cache because it was asked for: nothing to warn about.
+	if got := warnings(); got != "" {
+		t.Errorf("stderr = %q, want nothing", got)
+	}
+
 	// The variable for trying things out wins: no surprise requests.
 	t.Setenv(JudgeEnv, "fake:0.5")
 
@@ -128,6 +136,88 @@ func TestDefaultJudgeIsJev(t *testing.T) {
 		t.Fatal("no judge")
 	} else if _, ok := judge.(*FakeJudge); !ok {
 		t.Errorf("judge = %#v, want the fake one", judge)
+	}
+}
+
+func TestDefaultJudgeHasACache(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "decisions")
+
+	t.Setenv(JudgeEnv, "")
+	t.Setenv(APIKeyEnv, testKey)
+	t.Setenv(CacheEnv, dir)
+
+	judge, err := DefaultJudge()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cached, ok := judge.(*cachedJudge)
+	if !ok {
+		t.Fatalf("judge = %#v, want a cachedJudge", judge)
+	}
+
+	if jev, ok := cached.judge.(*JevJudge); !ok || jev.APIKey != testKey {
+		t.Errorf("it asks %#v, want a JevJudge with the key", cached.judge)
+	}
+
+	if disk, ok := cached.cache.(*diskCache); !ok || disk.dir != dir {
+		t.Errorf("it keeps decisions in %#v, want a diskCache in %s", cached.cache, dir)
+	}
+}
+
+// A cache that cannot be used must not keep anyone from running semcheck.
+func TestDefaultJudgeWithoutAUsableCache(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "file")
+	if err := os.WriteFile(file, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv(JudgeEnv, "")
+	t.Setenv(APIKeyEnv, testKey)
+	t.Setenv(CacheEnv, filepath.Join(file, "below"))
+
+	warnings := captureStderr(t)
+
+	judge, err := DefaultJudge()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, ok := judge.(*JevJudge); !ok {
+		t.Errorf("judge = %#v, want the JevJudge itself", judge)
+	}
+
+	if got := warnings(); !strings.HasPrefix(got, "semcheck: warning: running without a cache of decisions: cache: ") {
+		t.Errorf("stderr = %q, want a warning", got)
+	}
+}
+
+// captureStderr sends the warnings of the package to a file, and returns a
+// function that reads it.
+func captureStderr(t *testing.T) func() string {
+	t.Helper()
+
+	file, err := os.Create(filepath.Join(t.TempDir(), "stderr"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	original := stderr
+	stderr = file
+
+	t.Cleanup(func() {
+		stderr = original
+
+		file.Close()
+	})
+
+	return func() string {
+		data, err := os.ReadFile(file.Name())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		return string(data)
 	}
 }
 

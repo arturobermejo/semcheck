@@ -103,7 +103,8 @@ func FindConfig(dir string) (string, error) {
 }
 
 // DefaultJudge returns the judge of the drivers: Jev, with the key in
-// APIKeyEnv, unless JudgeEnv says otherwise.
+// APIKeyEnv and its decisions kept in the directory of CacheEnv, unless
+// JudgeEnv says otherwise.
 func DefaultJudge() (Judge, error) {
 	value := os.Getenv(JudgeEnv)
 
@@ -125,12 +126,34 @@ func DefaultJudge() (Judge, error) {
 	}
 
 	if key := os.Getenv(APIKeyEnv); key != "" {
-		return &JevJudge{APIKey: key}, nil
+		return withCache(&JevJudge{APIKey: key}), nil
 	}
 
 	// Not a judge that fails when asked: that would be a warning, and a run
 	// that cannot reach any model must not pass for a clean one.
 	return nil, fmt.Errorf("semcheck: there is no API key: set %s, or %s=fake:0.95 to try semcheck out without a model", APIKeyEnv, JudgeEnv)
+}
+
+// withCache returns judge behind the cache of decisions of CacheEnv. A cache
+// that cannot be used is worth a warning, not a failure: the judge still works.
+func withCache(judge cacheableJudge) Judge {
+	dir, err := cacheDir()
+	if err == nil && dir == "" {
+		return judge
+	}
+
+	var cache *diskCache
+	if err == nil {
+		cache, err = openDiskCache(dir)
+	}
+
+	if err != nil {
+		warn("running without a cache of decisions: " + strings.TrimPrefix(err.Error(), "semcheck: "))
+
+		return judge
+	}
+
+	return newCachedJudge(judge, cache)
 }
 
 // unprefixed is an error of the package API on its way through a driver, which
