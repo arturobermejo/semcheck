@@ -235,69 +235,66 @@ func TestAnalyzerQuestions(t *testing.T) {
 	}
 }
 
-// analyzerWithWarnings builds the analyzer of the standalone command, with its
-// warnings kept instead of written to the standard error.
-func analyzerWithWarnings(t *testing.T, cfg *Config, judge Judge) (*analysis.Analyzer, *[]string) {
+// output is what an analyzer had to say besides its findings.
+type output struct{ warnings, reports []string }
+
+// testAnalyzer builds an analyzer that keeps its output instead of writing it.
+func testAnalyzer(t *testing.T, cfg *Config, judge Judge, opts options) (*analysis.Analyzer, *output) {
 	t.Helper()
 
-	var warnings []string
+	out := &output{}
 
-	a, err := newAnalyzer(cfg, judge, options{honorNolint: true, warn: func(msg string) { warnings = append(warnings, msg) }})
+	opts.warn = func(msg string) { out.warnings = append(out.warnings, msg) }
+	opts.report = func(msg string) { out.reports = append(out.reports, msg) }
+
+	a, err := newAnalyzer(cfg, judge, opts)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	return a, &warnings
+	return a, out
 }
 
 func TestAnalyzerJudgeFails(t *testing.T) {
 	boom := errors.New("rate limited")
 
 	t.Run("by default it is a warning", func(t *testing.T) {
-		a, warnings := analyzerWithWarnings(t, &Config{Rules: []Rule{logRule()}}, &FakeJudge{Err: boom})
+		a, out := testAnalyzer(t, &Config{Rules: []Rule{logRule()}}, &FakeJudge{Err: boom}, options{honorNolint: true})
 
 		diagnostics, err := runOn(t, a, checkedSource)
 		if err != nil || len(diagnostics) != 0 {
 			t.Fatalf("got %v, %v; want no diagnostics and no error", diagnostics, err)
 		}
 
-		if want := []string{"p: 2 of 2 questions were not answered: the judge failed: rate limited"}; !slices.Equal(*warnings, want) {
-			t.Errorf("warnings = %q, want %q", *warnings, want)
+		if want := []string{"p: 2 of 2 questions were not answered: the judge failed: rate limited"}; !slices.Equal(out.warnings, want) {
+			t.Errorf("warnings = %q, want %q", out.warnings, want)
 		}
 	})
 
 	t.Run("fail_on_judge_error makes it an error", func(t *testing.T) {
-		a, warnings := analyzerWithWarnings(t, &Config{Rules: []Rule{logRule()}, FailOnJudgeError: true}, &FakeJudge{Err: boom})
+		a, out := testAnalyzer(t, &Config{Rules: []Rule{logRule()}, FailOnJudgeError: true}, &FakeJudge{Err: boom}, options{honorNolint: true})
 
 		diagnostics, err := runOn(t, a, checkedSource)
 		if !errors.Is(err, boom) || !strings.Contains(err.Error(), "2 of 2 questions") {
 			t.Errorf("error = %v, want one about 2 of 2 questions that wraps %v", err, boom)
 		}
 
-		if len(diagnostics) != 0 || len(*warnings) != 0 {
-			t.Errorf("got diagnostics %v and warnings %q along with the error", diagnostics, *warnings)
+		if len(diagnostics) != 0 || len(out.warnings) != 0 {
+			t.Errorf("got diagnostics %v and warnings %q along with the error", diagnostics, out.warnings)
 		}
 	})
 }
 
 // Drivers that cache results say so in the warning.
 func TestAnalyzerWarnsAboutStaleCaches(t *testing.T) {
-	var warnings []string
-
-	a, err := newAnalyzer(&Config{Rules: []Rule{logRule()}}, &FakeJudge{Err: errors.New("down")}, options{
-		warn:      func(msg string) { warnings = append(warnings, msg) },
-		staleHint: ". run cache clean",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	a, out := testAnalyzer(t, &Config{Rules: []Rule{logRule()}}, &FakeJudge{Err: errors.New("down")}, options{staleHint: ". run cache clean"})
 
 	if _, err := runOn(t, a, checkedSource); err != nil {
 		t.Fatal(err)
 	}
 
-	if want := []string{"p: 2 of 2 questions were not answered: the judge failed: down. run cache clean"}; !slices.Equal(warnings, want) {
-		t.Errorf("warnings = %q, want %q", warnings, want)
+	if want := []string{"p: 2 of 2 questions were not answered: the judge failed: down. run cache clean"}; !slices.Equal(out.warnings, want) {
+		t.Errorf("warnings = %q, want %q", out.warnings, want)
 	}
 }
 
@@ -321,7 +318,7 @@ func TestAnalyzerJudgeFailsForOneQuestion(t *testing.T) {
 	})
 
 	t.Run("the others are reported", func(t *testing.T) {
-		a, warnings := analyzerWithWarnings(t, &Config{Rules: []Rule{logRule()}}, judge)
+		a, out := testAnalyzer(t, &Config{Rules: []Rule{logRule()}}, judge, options{honorNolint: true})
 
 		diagnostics, err := runOn(t, a, checkedSource)
 		if err != nil {
@@ -332,13 +329,13 @@ func TestAnalyzerJudgeFailsForOneQuestion(t *testing.T) {
 			t.Errorf("got %d diagnostics, want the one that was answered", len(diagnostics))
 		}
 
-		if want := []string{"p: 1 of 2 questions were not answered: the model refused this fragment"}; !slices.Equal(*warnings, want) {
-			t.Errorf("warnings = %q, want %q", *warnings, want)
+		if want := []string{"p: 1 of 2 questions were not answered: the model refused this fragment"}; !slices.Equal(out.warnings, want) {
+			t.Errorf("warnings = %q, want %q", out.warnings, want)
 		}
 	})
 
 	t.Run("fail_on_judge_error counts them too", func(t *testing.T) {
-		a, _ := analyzerWithWarnings(t, &Config{Rules: []Rule{logRule()}, FailOnJudgeError: true}, judge)
+		a, _ := testAnalyzer(t, &Config{Rules: []Rule{logRule()}, FailOnJudgeError: true}, judge, options{honorNolint: true})
 
 		if _, err := runOn(t, a, checkedSource); !errors.Is(err, refused) {
 			t.Errorf("error = %v, want one that wraps %v", err, refused)
@@ -367,7 +364,7 @@ func TestAnalyzerSkipsHugeFragments(t *testing.T) {
 	judge := &FakeJudge{}
 
 	// Not the judge's fault: not an error even with fail_on_judge_error.
-	a, warnings := analyzerWithWarnings(t, &Config{Rules: []Rule{r}, FailOnJudgeError: true}, judge)
+	a, out := testAnalyzer(t, &Config{Rules: []Rule{r}, FailOnJudgeError: true}, judge, options{honorNolint: true})
 	if _, err := runOn(t, a, src); err != nil {
 		t.Fatal(err)
 	}
@@ -377,8 +374,8 @@ func TestAnalyzerSkipsHugeFragments(t *testing.T) {
 		t.Errorf("got %d questions, want only the one about small", len(qs))
 	}
 
-	if want := []string{"p: 1 fragments too large to ask about, the first at p.go:6:2"}; !slices.Equal(*warnings, want) {
-		t.Errorf("warnings = %q, want %q", *warnings, want)
+	if want := []string{"p: 1 fragments too large to ask about, the first at p.go:6:2"}; !slices.Equal(out.warnings, want) {
+		t.Errorf("warnings = %q, want %q", out.warnings, want)
 	}
 }
 
