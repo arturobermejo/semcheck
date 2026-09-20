@@ -298,14 +298,23 @@ func TestStandaloneDryRun(t *testing.T) {
 		t.Errorf("got %+v, want exit code 0 and nothing on stdout", got)
 	}
 
-	lines := strings.Split(strings.TrimSpace(got.stderr), "\n")
-	slices.Sort(lines)
-
 	const hello = "semcheck: dry run: github.com/arturobermejo/semcheck/cmd/semcheck/testdata/hello: "
 
-	if len(lines) != 2 ||
-		!strings.HasPrefix(lines[0], hello+"1 question (test-name-matches 1), ") ||
-		!strings.HasPrefix(lines[1], hello+"6 questions (doc-matches-code 3, name-matches-behavior 2, no-pii-in-logs 1), ") {
+	// The driver analyzes the package and its variant with the tests at the
+	// same time. The one that comes second has only what the first did not
+	// count: the test if it is the variant, nothing if it is the package.
+	const (
+		code = "6 questions (doc-matches-code 3, name-matches-behavior 2, no-pii-in-logs 1), "
+		test = "1 question (test-name-matches 1), "
+		both = "7 questions (doc-matches-code 3, name-matches-behavior 2, no-pii-in-logs 1, test-name-matches 1), "
+	)
+
+	lines := strings.Split(strings.TrimSpace(got.stderr), "\n")
+
+	packageFirst := len(lines) == 2 && strings.HasPrefix(lines[0], hello+code) && strings.HasPrefix(lines[1], hello+test)
+	variantFirst := len(lines) == 1 && strings.HasPrefix(lines[0], hello+both)
+
+	if !packageFirst && !variantFirst {
 		t.Errorf("stderr:\n%s", got.stderr)
 	}
 
