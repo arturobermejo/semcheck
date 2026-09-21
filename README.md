@@ -2,7 +2,7 @@
 
 A linter for Go whose rules are questions in plain English.
 
-Static analysis decides **where to look**: deterministic matchers on the syntax tree select exact nodes, such as a log call or a function named `GetSomething`. A decision model decides **whether the code is right**: it answers a closed question about each node with a probability, and semcheck reports the ones above a threshold.
+Static analysis decides **where to look**: deterministic matchers on the syntax tree select exact nodes, such as a log call or a function named `GetSomething`. A decision model decides **whether the code is right**: it answers a closed question about each node with a probability, and semcheck reports the ones above a threshold. Which model is up to you: see [Decision models](#decision-models).
 
 Two rules, as they are written in `.semcheck.yml`:
 
@@ -55,7 +55,7 @@ It runs by itself, as a `go vet` tool and as a [golangci-lint](https://golangci-
 go install github.com/arturobermejo/semcheck/cmd/semcheck@latest
 ```
 
-semcheck asks Jev, the decision model of TypeSafe AI, and reads the API key from `TYPESAFE_API_KEY`. It looks for `.semcheck.yml` in the current directory or the closest parent that has one; [the one of this repository](.semcheck.yml) is a starting point.
+semcheck needs a decision model to ask; with the provider the command ships with, the API key goes in `TYPESAFE_API_KEY` (see [Decision models](#decision-models)). It looks for `.semcheck.yml` in the current directory or the closest parent that has one; [the one of this repository](.semcheck.yml) is a starting point.
 
 ```bash
 semcheck ./...                              # exit code 3 if there are findings
@@ -112,15 +112,28 @@ golangci-lint custom                        # builds ./custom-gcl
 
 Writing a good question: ask about a **contradiction** the model can see in the fragment, not about something that is missing; be concrete; leave out adverbs such as "clearly". Then look at the numbers with `-record` before choosing `min_confidence`.
 
+## Decision models
+
+semcheck is not tied to a model. What it needs is a decision model: one that answers a closed question about a fragment of code with the probability that the answer is yes, and that answers many of them in one request. That is the whole `Judge` interface, and anything that meets it can be the judge: a hosted classifier, a model on your own machine, or a chat model whose answer is turned into a probability.
+
+| Provider | In the command | Key |
+|---|---|---|
+| Jev, from TypeSafe AI | yes, the default | `TYPESAFE_API_KEY` |
+| any other | as a library, behind `Judge` ([As a library](#as-a-library)) | its own |
+
+Adding a provider to the command is implementing `Judge` and selecting it in `DefaultJudge`. The cache, `-dry-run`, `-record`, the thresholds and the drivers work the same with any of them.
+
+Thresholds, costs and precision belong to a model: the numbers below are those of the provider that ships. With another one, look at its answers with `-record` before choosing `min_confidence`, and repeat the [evaluation](#evaluation).
+
 ## Cost, speed and the cache
 
 An answer is kept under a hash of the question, the code and its type notes, in the cache directory of the user (`SEMCHECK_CACHE` sets another, or `off`). Renaming a rule or moving its threshold costs nothing; changing a function asks about that function again.
 
-Measured on three projects, 6,412 questions took 203 seconds and 3.75 million tokens: **16 cents** for a first run on 300,000 lines of Go. On its own code, after a change that touched half of the files, semcheck asked 30 questions of 201.
+Measured on three projects with the provider that ships, 6,412 questions took 203 seconds and 3.75 million tokens: **16 cents** for a first run on 300,000 lines of Go. On its own code, after a change that touched half of the files, semcheck asked 30 questions of 201.
 
 ## Evaluation
 
-Five rules were run on [caddy](https://github.com/caddyserver/caddy), [cloudflared](https://github.com/cloudflare/cloudflared) and [pocketbase](https://github.com/pocketbase/pocketbase), at fixed commits. A sample of 96 questions, stratified by what the model had answered, was then labeled without seeing those answers.
+Five rules were run, with the provider that ships, on [caddy](https://github.com/caddyserver/caddy), [cloudflared](https://github.com/cloudflare/cloudflared) and [pocketbase](https://github.com/pocketbase/pocketbase), at fixed commits. A sample of 96 questions, stratified by what the model had answered, was then labeled without seeing those answers.
 
 | Rule | Questions | Findings | Labeled | Right | Precision |
 |---|---|---|---|---|---|
@@ -151,7 +164,7 @@ go run ./eval metrics
 
 ## What leaves your machine
 
-Using Jev sends the code of every question, and the notes on its types, to the API of TypeSafe AI. semcheck only does it with an API key in the environment, and sends nothing else: not the file, not its path. `semcheck -dry-run -record=file` writes exactly what would be sent.
+A decision model behind an API gets the code of every question and the notes on its types; with the provider that ships, that is the API of TypeSafe AI. semcheck only sends them with an API key in the environment, and sends nothing else: not the file, not its path. A model on your own machine keeps everything there. `semcheck -dry-run -record=file` writes exactly what would be sent.
 
 ## Limits
 
@@ -164,11 +177,19 @@ Using Jev sends the code of every question, and the notes on its types, to the A
 
 ```go
 cfg, err := semcheck.LoadConfig(".semcheck.yml")
-judge, err := semcheck.DefaultJudge() // Jev, with the cache
+judge, err := semcheck.DefaultJudge() // the provider that ships, with the cache
 analyzer, err := semcheck.NewAnalyzer(cfg, judge)
 ```
 
-`Judge` is one method that answers a batch of questions with probabilities: any model can be put behind it.
+`Judge` is one method that answers a batch of questions with probabilities; putting another model behind it is implementing that method:
+
+```go
+type Judge interface {
+	Decide(ctx context.Context, questions []Question) ([]Decision, error)
+}
+```
+
+A `Question` carries the rule, the question, the fragment of code and its type notes; a `Decision` carries the probability of yes, or the error of that one question.
 
 ## License
 
