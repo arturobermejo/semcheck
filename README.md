@@ -121,6 +121,8 @@ semcheck is not tied to a model. What it needs is a decision model: one that ans
 | Jev, from TypeSafe AI | yes, the default | `TYPESAFE_API_KEY` |
 | any other | as a library, behind `Judge` ([As a library](#as-a-library)) | its own |
 
+Jev answers each question as a `Noul`: the probability that the statement is true, from 0 to 1. `min_confidence` is the threshold on the probability of the answer in `report_if`.
+
 Adding a provider to the command is implementing `Judge` and selecting it in `DefaultJudge`. The cache, `-dry-run`, `-record`, the thresholds and the drivers work the same with any of them.
 
 Thresholds, costs and precision belong to a model: the numbers below are those of the provider that ships. With another one, look at its answers with `-record` before choosing `min_confidence`, and repeat the [evaluation](#evaluation).
@@ -190,6 +192,10 @@ type Judge interface {
 ```
 
 A `Question` carries the rule, the question, the fragment of code and its type notes; a `Decision` carries the probability of yes, or the error of that one question.
+
+## How it was made
+
+The code, tests and documentation were written with the help of AI; the design, the rules, the evaluation and the review of every change were directed by the author.
 
 ## License
 
